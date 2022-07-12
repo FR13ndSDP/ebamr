@@ -1,0 +1,8 @@
+TINY_PROFILE = TRUE
+
+DEBUG = FALSE
+USE_MPI = TRUE
+USE_OMP = TRUE
+
+include ./Make.NC
+
