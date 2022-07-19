@@ -96,6 +96,16 @@ NC::variableSetUp ()
 
     Geometry const* gg = AMReX::top()->getDefaultGeometry();
 
+    nc_init_fort(phys_bc.lo(), phys_bc.hi(),
+                 PhysBCType::interior,
+                 PhysBCType::inflow,
+                 PhysBCType::outflow,
+                 PhysBCType::symmetry,
+                 PhysBCType::slipwall,
+                 PhysBCType::noslipwall,
+                 ParallelDescriptor::MyProc(),
+                 gg->ProbLo(), gg->ProbHi());
+
     bool state_data_extrap = false;
     bool store_in_checkpoint = true;
     desc_lst.addDescriptor(State_Type,IndexType::TheCellType(),
@@ -118,7 +128,7 @@ NC::variableSetUp ()
                           Density,
                           name,
                           bcs,
-                          BndryFunc(nullfill));
+                          BndryFunc(nc_denfill));
 
     desc_lst.addDescriptor(Cost_Type, IndexType::TheCellType(), StateDescriptor::Point,
                            0,1, &pc_interp);
@@ -127,6 +137,31 @@ NC::variableSetUp ()
     num_state_data_types = desc_lst.size();
 
     StateDescriptor::setBndryFuncThreadSafety(true);
+
+    // DEFINE DERIVED QUANTITIES
+
+    // Pressure
+    // get pressure from Eint
+    derive_lst.add("pressure",IndexType::TheCellType(),1,
+                   nc_derpres,the_same_box);
+    derive_lst.addComponent("pressure",desc_lst,State_Type,Eint,1);
+
+    // Velocities
+    // get velocity by momentum/density
+    derive_lst.add("x_velocity",IndexType::TheCellType(),1,
+                   nc_dervel,the_same_box);
+    derive_lst.addComponent("x_velocity",desc_lst,State_Type,Density,1);
+    derive_lst.addComponent("x_velocity",desc_lst,State_Type,Xmom,1);
+
+    derive_lst.add("y_velocity",IndexType::TheCellType(),1,
+                   nc_dervel,the_same_box);
+    derive_lst.addComponent("y_velocity",desc_lst,State_Type,Density,1);
+    derive_lst.addComponent("y_velocity",desc_lst,State_Type,Ymom,1);
+
+    derive_lst.add("z_velocity",IndexType::TheCellType(),1,
+                   nc_dervel,the_same_box);
+    derive_lst.addComponent("z_velocity",desc_lst,State_Type,Density,1);
+    derive_lst.addComponent("z_velocity",desc_lst,State_Type,Zmom,1);
 }
 
 void
