@@ -17,6 +17,10 @@ include $(TOP)/Source/Make.package
 INCLUDE_LOCATIONS += $(TOP)/Source
 VPATH_LOCATIONS   += $(TOP)/Source
 
+include $(TOP)/Source/kernel/Make.package
+INCLUDE_LOCATIONS += $(TOP)/Source/kernel
+VPATH_LOCATIONS   += $(TOP)/Source/kernel
+
 include $(AMREX_HOME)/Src/Base/Make.package
 include $(AMREX_HOME)/Src/Boundary/Make.package
 include $(AMREX_HOME)/Src/AmrCore/Make.package

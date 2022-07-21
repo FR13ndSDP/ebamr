@@ -9,6 +9,7 @@ contains
   ! All subroutines in this file must be threadsafe because they are called
   ! inside OpenMP parallel regions.
 
+  ! fill boundary for all components
   subroutine nc_hypfill(adv,adv_lo,adv_hi,domlo,domhi,delta,xlo,time,bc) &
     bind(C, name="nc_hypfill")
 
@@ -32,7 +33,7 @@ contains
       call amrex_filcc(adv(:,:,:,n),adv_lo(1),adv_lo(2),adv_lo(3),adv_hi(1),adv_hi(2),adv_hi(3),domlo,domhi,delta,xlo,bc(:,:,n))
     enddo
 
-    !bc (direction, lo_or_hi, var)
+    !bc (direction, lo_or_hi, var) index starts from 1
     if ( bc(1,1,1).eq.amrex_bc_ext_dir .and. adv_lo(1).lt.domlo(1)) then
       do       k = adv_lo(3), adv_hi(3)
         do    j = adv_lo(2), adv_hi(2)
@@ -42,8 +43,6 @@ contains
             adv(i,j,k,3) = 0.d0
             adv(i,j,k,4) = 0.d0
             adv(i,j,k,5) = p_l/(gamma-1.d0) + 0.5d0*u_l*u_l*rho_l
-            adv(i,j,k,6) = p_l/(gamma-1.d0)
-            adv(i,j,k,7) = adv(i,j,k,6)/(rho_l * cv)
           end do
         end do
       end do
@@ -51,8 +50,7 @@ contains
 
   end subroutine nc_hypfill
 
-
-
+  ! fill boundary for density, the tag variable (or first component?)
   subroutine nc_denfill(adv,adv_lo,adv_hi,domlo,domhi,delta,xlo,time,bc) &
     bind(C, name="nc_denfill")
 

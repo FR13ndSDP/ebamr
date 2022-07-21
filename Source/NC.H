@@ -94,8 +94,6 @@ public:
                           int n_error_buf = 0,
                           int ngrow = 0) override;
 
-    virtual int WorkEstType() override { return Cost_Type; }
-
     static int numGrow() { return NUM_GROW; }
 
     static void variableSetUp();
@@ -122,8 +120,6 @@ protected:
     // Compute initial time step.
     amrex::Real initialTimeStep();
 
-    void computeTemp(amrex::MultiFab &State, int ng);
-
     // core function
     void compute_dSdt(const amrex::MultiFab &S, amrex::MultiFab &dSdt, amrex::Real dt,
                       amrex::EBFluxRegister *fr_as_crse, amrex::EBFluxRegister *fr_as_fine);
@@ -147,6 +143,8 @@ protected:
     static constexpr int level_mask_physbnd = 3;    // outside domain
 
     static constexpr int NUM_GROW = 5;
+
+    // conservative states
     enum StateVariable
     {
         Density = 0,
@@ -154,17 +152,14 @@ protected:
         Ymom,
         Zmom,
         Eden,
-        Eint,
-        Temp,
         NUM_STATE
     };
 
-    enum StateDataType
+    enum StateType
     {
         State_Type = 0,
-        Cost_Type
+        NUM_STATE_TYPE
     };
-    static int num_state_data_types;
 
     static amrex::BCRec phys_bc;
 

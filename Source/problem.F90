@@ -7,15 +7,6 @@ module probdata_module
   real(rt), save :: rho_r = 0.125d0
   real(rt), save :: u_l   = 0.d0
   real(rt), save :: u_r   = 0.d0
-  integer :: is_sod = 1
-  ! real(rt), save :: T_l = 298
-  ! real(rt), save :: T_r = 298
-  ! real(rt), save :: p_l   = 101000
-  ! real(rt), save :: p_r   = 101000
-  ! real(rt), save :: rho_l = 1.1809103934
-  ! real(rt), save :: rho_r = 1.1809103934
-  ! real(rt), save :: u_l = 1038.0959267853
-  ! real(rt), save :: u_r = 1038.0959267853
 end module probdata_module
 
 
@@ -35,14 +26,13 @@ subroutine amrex_probinit (init,name,namlen,problo,probhi) bind(c)
   call pp%query("rho_r",rho_r)
   call pp%query("u_l",u_l)
   call pp%query("u_r",u_r)
-  call pp%query("is_sod",is_sod)
   call amrex_parmparse_destroy(pp)
 end subroutine amrex_probinit
 
 
 subroutine initdata_f(level, time, lo, hi, u, ulo, uhi, dx, prob_lo) bind(C, name="initdata_f")
   use amrex_fort_module, only : rt => amrex_real
-  use nc_module, only : nvar, urho, umx, umy, umz, ueden, ueint, utemp, gamma, cv
+  use nc_module, only : nvar, urho, umx, umy, umz, ueden, gamma, cv
   use probdata_module
   implicit none
   integer, intent(in) :: level, lo(3), hi(3), ulo(3), uhi(3)
@@ -51,14 +41,13 @@ subroutine initdata_f(level, time, lo, hi, u, ulo, uhi, dx, prob_lo) bind(C, nam
   real(rt), intent(in) :: dx(3), prob_lo(3)
 
   integer :: i,j,k
-  real(rt) :: x, Pt, rhot, uxt
+  real(rt) :: x, y, Pt, rhot, uxt, vxt
 
   do k = lo(3), hi(3)
      do j = lo(2), hi(2)
         do i = lo(1), hi(1)
            x = prob_lo(1) + (i+0.5d0)*dx(1)
 
-           if (is_sod .eq. 1) then
             if (x .lt. 0.5d0) then
               Pt = p_l
               rhot = rho_l
@@ -68,18 +57,11 @@ subroutine initdata_f(level, time, lo, hi, u, ulo, uhi, dx, prob_lo) bind(C, nam
                 rhot = rho_r
                 uxt = u_r
             end if
-          else
-            Pt = p_r
-            rhot = rho_r
-            uxt = u_r
-          end if
 
           u(i,j,k,urho) = rhot
           u(i,j,k,umx) = rhot * uxt
           u(i,j,k,umy:umz) = 0.d0
-          u(i,j,k,ueint) = Pt/(gamma - 1.d0)
-          u(i,j,k,ueden) = u(i,j,k,ueint) + 0.5d0*rhot*uxt*uxt
-          u(i,j,k,utemp) = u(i,j,k,ueint)/(rhot*cv)
+          u(i,j,k,ueden) = Pt/(gamma - 1.d0) + 0.5d0*rhot*(uxt*uxt + vxt*vxt)
         end do
      end do
   end do

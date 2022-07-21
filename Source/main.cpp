@@ -75,13 +75,13 @@ int main (int argc, char* argv[])
         timer_advance = amrex::second() - timer_advance;
 
         // Write final checkpoint and plotfile
-        // if (amr.stepOfLastCheckPoint() < amr.levelSteps(0)) {
-        //     amr.checkPoint();
-        // }
+        if (amr.stepOfLastCheckPoint() < amr.levelSteps(0)) {
+            amr.checkPoint();
+        }
 
-        // if (amr.stepOfLastPlotFile() < amr.levelSteps(0)) {
-        //     amr.writePlotFile();
-        // }
+        if (amr.stepOfLastPlotFile() < amr.levelSteps(0)) {
+            amr.writePlotFile();
+        }
     }
 
     timer_tot = amrex::second() - timer_tot;

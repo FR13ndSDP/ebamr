@@ -53,6 +53,26 @@ extern "C"
                      const amrex_real* delta, const amrex_real* xlo,
                      const amrex_real* time, const amrex_real* dt, const int* bcrec,
                      const int* level, const int* grid_no);
+
+    void nc_dertemp (BL_FORT_FAB_ARG_3D(der),const int* nvar,
+                    const BL_FORT_FAB_ARG_3D(data),const int* ncomp,
+                    const int* lo, const int* hi,
+                    const int* domain_lo, const int* domain_hi,
+                    const amrex_real* delta, const amrex_real* xlo,
+                    const amrex_real* time, const amrex_real* dt, const int* bcrec,
+                    const int* level, const int* grid_no);
+
+    void nc_estdt(const int* lo, const int* hi,
+                  const amrex_real* u, const int* ulo, const int* uhi,
+                  const amrex_real* dx, amrex_real* dt);
+
+    void compute_dudt(const int* lo, const int* hi,
+                      amrex_real* dudt, const int* utlo, const int* uthi,
+                      const amrex_real* u, const int* ulo, const int* uhi,
+                      amrex_real* fx, const int* fxlo, const int* fxhi,
+                      amrex_real* fy, const int* fylo, const int* fyhi,
+                      amrex_real* fz, const int* fzlo, const int* fzhi,
+                      const amrex_real* dx);
 #ifdef __cplusplus
 }
 #endif

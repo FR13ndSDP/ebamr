@@ -16,9 +16,7 @@ module nc_module
   integer, parameter, public :: UMY   = 3
   integer, parameter, public :: UMZ   = 4
   integer, parameter, public :: UEDEN = 5
-  integer, parameter, public :: UEINT = 6
-  integer, parameter, public :: UTEMP = 7
-  integer, parameter, public :: NVAR  = 7
+  integer, parameter, public :: NVAR  = 5
 
   ! primitive variables index
   integer, parameter, public :: QRHO   = 1
@@ -26,10 +24,7 @@ module nc_module
   integer, parameter, public :: QV     = 3
   integer, parameter, public :: QW     = 4
   integer, parameter, public :: QP     = 5
-  integer, parameter, public :: QC     = 6
-  integer, parameter, public :: QEINT  = 7
-  integer, parameter, public :: QTEMP  = 8
-  integer, parameter, public :: QVAR   = 8
+  integer, parameter, public :: QVAR   = 5
 
 
   real(rt), parameter, public :: smallp = 1.d-10
@@ -43,15 +38,9 @@ module nc_module
   ! problem domain
   real(rt), save, public :: problo(3), probhi(3), center(3)
 
-  logical, save, public :: actually_2D = .false.
-  logical, save, public :: use_total_energy_as_eb_weights = .false.
-  logical, save, public :: use_volfrac_as_eb_weights = .false.
-  logical, save, public :: use_mass_as_eb_weights = .false.
-  logical, save, public :: do_reredistribution = .true.
-
   integer, save, public :: myproc
 
-  real(rt), parameter, public :: gamma = 1.4d0, cv = 717.5d0
+  real(rt), parameter, public :: gamma = 1.4d0, cv = 717.5d0, R = 287.d0
   
   public :: nc_init_fort
 
@@ -68,10 +57,6 @@ contains
     integer, value, intent(in) :: myproc_in
     real(rt), intent(in) :: problo_in(3), probhi_in(3)
 
-    type(amrex_parmparse) :: pp
-    integer :: dim, i_use_total_energy_as_eb_weights, i_use_mass_as_eb_weights, i_use_volfrac_as_eb_weights
-    integer :: i_do_reredistribution
-
     physbc_lo = physbc_lo_in
     physbc_hi = physbc_hi_in
 
@@ -87,31 +72,6 @@ contains
     problo = problo_in
     probhi = probhi_in
     center = 0.5d0*(problo+probhi)
-
-    call amrex_parmparse_build(pp,"nc")
-
-    dim = 3
-    call pp%query("dim", dim)
-    actually_2D = dim.eq.2
-
-    i_use_total_energy_as_eb_weights = 0
-    i_use_mass_as_eb_weights = 0
-    i_use_volfrac_as_eb_weights = 0
-    call pp%query("use_total_energy_as_eb_weights", i_use_total_energy_as_eb_weights)
-    call pp%query("use_mass_as_eb_weights", i_use_mass_as_eb_weights)
-    call pp%query("use_volfrac_as_eb_weights", i_use_volfrac_as_eb_weights)
-    use_total_energy_as_eb_weights = i_use_total_energy_as_eb_weights .ne. 0
-    use_mass_as_eb_weights = i_use_mass_as_eb_weights .ne. 0
-    use_volfrac_as_eb_weights = i_use_volfrac_as_eb_weights .ne. 0
-
-    i_do_reredistribution = 1
-    call pp%query("do_reredistribution", i_do_reredistribution)
-    do_reredistribution = i_do_reredistribution .ne. 0
-    if (.not.do_reredistribution) then
-       call amrex_eb_disable_reredistribution()
-    end if
-
-    call amrex_parmparse_destroy(pp)
 
   end subroutine nc_init_fort
 

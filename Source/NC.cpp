@@ -67,9 +67,6 @@ NC::init (AmrLevel& old)
 
     MultiFab& S_new = get_new_data(State_Type);
     FillPatch(old,S_new,0,cur_time,State_Type,0,NUM_STATE);
-
-    MultiFab& C_new = get_new_data(Cost_Type);
-    FillPatch(old,C_new,0,cur_time,Cost_Type,0,1);
 }
 
 void
@@ -83,9 +80,6 @@ NC::init ()
 
     MultiFab& S_new = get_new_data(State_Type);
     FillCoarsePatch(S_new, 0, cur_time, State_Type, 0, NUM_STATE);
-
-    MultiFab& C_new = get_new_data(Cost_Type);
-    FillCoarsePatch(C_new, 0, cur_time, Cost_Type, 0, 1);
 }
 
 void
@@ -109,9 +103,6 @@ NC::initData ()
                    BL_TO_FORTRAN_ANYD(S_new[mfi]),
                    dx, prob_lo);
     }
-
-    MultiFab& C_new = get_new_data(Cost_Type);
-    C_new.setVal(1.0);
 }
 
 void
@@ -426,13 +417,12 @@ NC::avgDown ()
     MultiFab& S_crse =          get_new_data(State_Type);
     MultiFab& S_fine = fine_lev.get_new_data(State_Type);
 
-    MultiFab volume(S_fine.boxArray(), S_fine.DistributionMap(), 1, 0);
-    volume.setVal(1.0);
-    amrex::EB_average_down(S_fine, S_crse, volume, fine_lev.volFrac(),
-                           0, S_fine.nComp(), fine_ratio);
+    // MultiFab volume(S_fine.boxArray(), S_fine.DistributionMap(), 1, 0);
+    // volume.setVal(1.0);
+    // amrex::EB_average_down(S_fine, S_crse, volume, fine_lev.volFrac(),
+    //                        0, S_fine.nComp(), fine_ratio);
 
-    const int nghost = 0;
-    //computeTemp (S_crse, nghost);
+    amrex::average_down(S_fine, S_crse, 0, S_fine.nComp(), fine_ratio);
 }
 
 void
@@ -464,7 +454,36 @@ NC::buildMetrics ()
 
 Real NC::estTimeStep()
 {
-    return 1.0;
+    Real estdt = std::numeric_limits<Real>::max();
+
+    const Real* dx = geom.CellSize();
+    const MultiFab& S = get_new_data(State_Type);
+
+    auto const& fact = dynamic_cast<EBFArrayBoxFactory const&>(S.Factory());
+    auto const& flags = fact.getMultiEBCellFlagFab();
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel reduction(min:estdt)
+#endif
+    {
+        Real dt = std::numeric_limits<Real>::max();
+        for (MFIter mfi(S, true); mfi.isValid(); ++mfi)
+        {
+            const Box& bx = mfi.tilebox();
+            const auto& flag = flags[mfi];
+            if (flag.getType(bx) != FabType::covered)
+            {
+                nc_estdt(BL_TO_FORTRAN_BOX(bx),
+                         BL_TO_FORTRAN_ANYD(S[mfi]),
+                         dx, &dt);
+            }
+        }
+        estdt = std::min(estdt, dt);
+    }
+
+    estdt *= cfl;
+    ParallelDescriptor::ReduceRealMin(estdt);
+    return estdt;
 }
 
 Real NC::initialTimeStep()
@@ -472,7 +491,108 @@ Real NC::initialTimeStep()
     return estTimeStep();
 }
 
+// core functions here
+// S_new with 5 ghost cells
+// Sborder with 5 ghost cells
+// dSdt with 0 ghost cells
 Real NC::advance(Real time, Real dt, int iteration, int ncycle)
 {
-    return 1.0;
+    state[State_Type].allocOldData();
+    state[State_Type].swapTimeLevels(dt);
+
+    MultiFab& S_new = get_new_data(State_Type);
+    MultiFab& S_old = get_old_data(State_Type);
+    // rhs
+    MultiFab dSdt(grids, dmap, NUM_STATE, 0, MFInfo(), Factory());
+    // state with ghost cell
+    MultiFab Sborder(grids, dmap, NUM_STATE, NUM_GROW, MFInfo(), Factory());
+
+    EBFluxRegister* fine = nullptr; 
+    EBFluxRegister* current = nullptr; 
+
+    if (do_reflux && level < parent->finestLevel())
+    {
+        NC& fine_level = getLevel(level+1);
+        fine = &fine_level.flux_reg;
+    }
+
+    if (do_reflux && level > 0)
+    {
+        current = &flux_reg;
+    }
+
+    if (fine) fine->reset();
+
+    // RK2 stage 1
+    FillPatch(*this, Sborder, NUM_GROW, time, State_Type, 0, NUM_STATE);
+    compute_dSdt(Sborder, dSdt, 0.5*dt, fine, current);
+    // U^* = U^n + dt * dUdt^n
+    // S_new = 1 * Sborder + dt * dSdt
+    MultiFab::LinComb(S_new, 1.0, Sborder, 0, dt, dSdt, 0, 0, NUM_STATE, 0);
+
+    // Rk2 stage 2
+    // after fillpatch Sborder is U^*
+    FillPatch(*this, Sborder, NUM_GROW, time+dt, State_Type, 0, NUM_STATE);
+    compute_dSdt(Sborder, dSdt, 0.5*dt, fine, current);
+    // S_new = 0.5 * U^* + 0.5 * U^n + 0.5*dt*dUdt^*
+    MultiFab::LinComb(S_new, 0.5, Sborder, 0, 0.5, S_old, 0, 0, NUM_STATE, 0);
+    MultiFab::Saxpy(S_new, 0.5*dt, dSdt, 0, 0, NUM_STATE, 0);
+    return dt;
+}
+
+// compute rhs flux
+// bx with no ghost cell
+// flux is defined on box face
+void NC::compute_dSdt(const amrex::MultiFab &S, amrex::MultiFab &dSdt, amrex::Real dt, amrex::EBFluxRegister *fine, amrex::EBFluxRegister *current)
+{
+    const Real* dx = geom.CellSize();
+    const int ncomp = dSdt.nComp();
+
+    auto const& fact = dynamic_cast<EBFArrayBoxFactory const&>(S.Factory());
+    auto const& flags = fact.getMultiEBCellFlagFab();
+
+    std::array<FArrayBox,AMREX_SPACEDIM> flux;
+
+    for (MFIter mfi(S, MFItInfo().EnableTiling(hydro_tile_size).SetDynamic(true));
+                mfi.isValid(); ++mfi)
+    {
+        const Box& bx = mfi.tilebox();
+
+        const auto& flag = flags[mfi];
+
+        if (flag.getType(bx) == FabType::covered) {
+            dSdt[mfi].setVal<RunOn::Host>(0.0, bx, 0, ncomp);
+        } else {
+            // flux is used to store centroid flux needed for reflux
+            // for flux_x in x direction is nodal, in other directions centroid
+            // for flux_y in y ...
+            for (int idim=0; idim < AMREX_SPACEDIM; ++idim) {
+                flux[idim].resize(amrex::surroundingNodes(bx,idim),ncomp);
+            }
+
+            if (flag.getType(amrex::grow(bx,1)) == FabType::regular)
+            {
+                compute_dudt(BL_TO_FORTRAN_BOX(bx),
+                                    BL_TO_FORTRAN_ANYD(dSdt[mfi]),
+                                    BL_TO_FORTRAN_ANYD(S[mfi]),
+                                    BL_TO_FORTRAN_ANYD(flux[0]),
+                                    BL_TO_FORTRAN_ANYD(flux[1]),
+                                    BL_TO_FORTRAN_ANYD(flux[2]),
+                                    dx);
+
+                // the flux registers from the coarse or fine grid perspective
+                // NOTE: the flux register associated with flux_reg[lev] is associated
+                // with the lev/lev-1 interface (and has grid spacing associated with lev-1)
+                if (fine) {
+                // update the lev+1/lev flux register (index lev+1)
+                    fine->CrseAdd(mfi,{&flux[0],&flux[1],&flux[2]},dx,dt,RunOn::Cpu);
+                }
+
+                if (current) {
+                // update the lev/lev-1 flux register (index lev)
+                    current->FineAdd(mfi,{&flux[0],&flux[1],&flux[2]},dx,dt,RunOn::Cpu);
+                }
+            }
+        }
+    }
 }

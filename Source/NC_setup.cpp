@@ -4,8 +4,6 @@
 
 using namespace amrex;
 
-int NC::num_state_data_types = 0;
-
 static Box the_same_box (const Box& b) { return b; }
 //static Box grow_box_by_one (const Box& b) { return amrex::grow(b,1); }
 
@@ -108,6 +106,7 @@ NC::variableSetUp ()
 
     bool state_data_extrap = false;
     bool store_in_checkpoint = true;
+    // use eb_cell_cons_interp
     desc_lst.addDescriptor(State_Type,IndexType::TheCellType(),
                            StateDescriptor::Point,NUM_GROW,NUM_STATE,
                            &eb_cell_cons_interp,state_data_extrap,store_in_checkpoint);
@@ -121,30 +120,16 @@ NC::variableSetUp ()
     cnt++; set_y_vel_bc(bc,phys_bc);  bcs[cnt] = bc; name[cnt] = "ymom";
     cnt++; set_z_vel_bc(bc,phys_bc);  bcs[cnt] = bc; name[cnt] = "zmom";
     cnt++; set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "rho_E";
-    cnt++; set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "rho_e";
-    cnt++; set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "Temp";
 
     desc_lst.setComponent(State_Type,
                           Density,
                           name,
                           bcs,
-                          BndryFunc(nc_denfill));
-
-    desc_lst.addDescriptor(Cost_Type, IndexType::TheCellType(), StateDescriptor::Point,
-                           0,1, &pc_interp);
-    desc_lst.setComponent(Cost_Type, 0, "Cost", bc, BndryFunc(nullfill));
-
-    num_state_data_types = desc_lst.size();
+                          BndryFunc(nc_denfill, nc_hypfill));
 
     StateDescriptor::setBndryFuncThreadSafety(true);
 
     // DEFINE DERIVED QUANTITIES
-
-    // Pressure
-    // get pressure from Eint
-    derive_lst.add("pressure",IndexType::TheCellType(),1,
-                   nc_derpres,the_same_box);
-    derive_lst.addComponent("pressure",desc_lst,State_Type,Eint,1);
 
     // Velocities
     // get velocity by momentum/density
