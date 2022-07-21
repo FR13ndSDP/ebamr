@@ -497,6 +497,8 @@ Real NC::initialTimeStep()
 // dSdt with 0 ghost cells
 Real NC::advance(Real time, Real dt, int iteration, int ncycle)
 {
+    BL_PROFILE("NC::advance");
+
     state[State_Type].allocOldData();
     state[State_Type].swapTimeLevels(dt);
 
@@ -545,6 +547,8 @@ Real NC::advance(Real time, Real dt, int iteration, int ncycle)
 // flux is defined on box face
 void NC::compute_dSdt(const amrex::MultiFab &S, amrex::MultiFab &dSdt, amrex::Real dt, amrex::EBFluxRegister *fine, amrex::EBFluxRegister *current)
 {
+    BL_PROFILE("NC::compute_dSdt");
+
     const Real* dx = geom.CellSize();
     const int ncomp = dSdt.nComp();
 

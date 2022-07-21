@@ -1,4 +1,4 @@
-max_step  = 1000
+max_step  = 100
 stop_time = 0.14
 
 geometry.is_periodic = 0 0 0
@@ -53,7 +53,6 @@ eb2.plane_point = 0.4 0.0 0.0
 eb2.plane_normal = 0.5 -0.866 0.0
 
 
-nc.dim = 3
 nc.refine_dengrad = 0.01
 nc.refine_max_dengrad_lev = 2
 nc.do_reflux = 1
