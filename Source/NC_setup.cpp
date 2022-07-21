@@ -115,11 +115,11 @@ NC::variableSetUp ()
     Vector<std::string> name(NUM_STATE);
     BCRec bc;
     int cnt = 0;
-    set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "density";
+    set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "rho";
     cnt++; set_x_vel_bc(bc,phys_bc);  bcs[cnt] = bc; name[cnt] = "xmom";
     cnt++; set_y_vel_bc(bc,phys_bc);  bcs[cnt] = bc; name[cnt] = "ymom";
     cnt++; set_z_vel_bc(bc,phys_bc);  bcs[cnt] = bc; name[cnt] = "zmom";
-    cnt++; set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "rho_E";
+    cnt++; set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "E";
 
     desc_lst.setComponent(State_Type,
                           Density,
@@ -131,22 +131,38 @@ NC::variableSetUp ()
 
     // DEFINE DERIVED QUANTITIES
 
+    derive_lst.add("T",IndexType::TheCellType(),1,
+                   nc_dertemp,the_same_box);
+    derive_lst.addComponent("T",desc_lst,State_Type,Density,1);
+    derive_lst.addComponent("T",desc_lst,State_Type,Xmom,1);
+    derive_lst.addComponent("T",desc_lst,State_Type,Ymom,1);
+    derive_lst.addComponent("T",desc_lst,State_Type,Zmom,1);
+    derive_lst.addComponent("T",desc_lst,State_Type,Eden,1);
+
+    derive_lst.add("p",IndexType::TheCellType(),1,
+                   nc_derpres,the_same_box);
+    derive_lst.addComponent("p",desc_lst,State_Type,Density,1);
+    derive_lst.addComponent("p",desc_lst,State_Type,Xmom,1);
+    derive_lst.addComponent("p",desc_lst,State_Type,Ymom,1);
+    derive_lst.addComponent("p",desc_lst,State_Type,Zmom,1);
+    derive_lst.addComponent("p",desc_lst,State_Type,Eden,1);
+
     // Velocities
     // get velocity by momentum/density
-    derive_lst.add("x_velocity",IndexType::TheCellType(),1,
+    derive_lst.add("ux",IndexType::TheCellType(),1,
                    nc_dervel,the_same_box);
-    derive_lst.addComponent("x_velocity",desc_lst,State_Type,Density,1);
-    derive_lst.addComponent("x_velocity",desc_lst,State_Type,Xmom,1);
+    derive_lst.addComponent("ux",desc_lst,State_Type,Density,1);
+    derive_lst.addComponent("ux",desc_lst,State_Type,Xmom,1);
 
-    derive_lst.add("y_velocity",IndexType::TheCellType(),1,
+    derive_lst.add("uy",IndexType::TheCellType(),1,
                    nc_dervel,the_same_box);
-    derive_lst.addComponent("y_velocity",desc_lst,State_Type,Density,1);
-    derive_lst.addComponent("y_velocity",desc_lst,State_Type,Ymom,1);
+    derive_lst.addComponent("uy",desc_lst,State_Type,Density,1);
+    derive_lst.addComponent("uy",desc_lst,State_Type,Ymom,1);
 
-    derive_lst.add("z_velocity",IndexType::TheCellType(),1,
+    derive_lst.add("uz",IndexType::TheCellType(),1,
                    nc_dervel,the_same_box);
-    derive_lst.addComponent("z_velocity",desc_lst,State_Type,Density,1);
-    derive_lst.addComponent("z_velocity",desc_lst,State_Type,Zmom,1);
+    derive_lst.addComponent("uz",desc_lst,State_Type,Density,1);
+    derive_lst.addComponent("uz",desc_lst,State_Type,Zmom,1);
 }
 
 void
