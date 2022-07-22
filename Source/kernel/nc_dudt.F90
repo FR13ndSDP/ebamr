@@ -29,7 +29,6 @@ module dudt_module
   
       integer :: qlo(3), qhi(3)
       real(rt), dimension(:,:,:,:), pointer, contiguous :: q
-      integer :: k,n
 
       ! primitive is grown by nghost_plm
       qlo = lo - nghost_plm
@@ -62,16 +61,14 @@ module dudt_module
     
         dxinv = 1.d0/dx
     
-        do n = 1, ncomp
-           do       k = lo(3),hi(3)
-              do    j = lo(2),hi(2)
-                 do i = lo(1),hi(1)
-                    ut(i,j,k,n) = (fx(i,j,k,n)-fx(i+1,j,k,n)) * dxinv(1) &
-                         +        (fy(i,j,k,n)-fy(i,j+1,k,n)) * dxinv(2) &
-                         +        (fz(i,j,k,n)-fz(i,j,k+1,n)) * dxinv(3)
-                 end do
+        do       k = lo(3),hi(3)
+          do     j = lo(2),hi(2)
+              do i = lo(1),hi(1)
+                ut(i,j,k,:) = (fx(i,j,k,:)-fx(i+1,j,k,:)) * dxinv(1) &   
+                      +       (fy(i,j,k,:)-fy(i,j+1,k,:)) * dxinv(2) &
+                      +       (fz(i,j,k,:)-fz(i,j,k+1,:)) * dxinv(3)
               end do
-           end do
+          end do
         end do
     end subroutine compute_divop
 

@@ -1,12 +1,23 @@
 module probdata_module
   use amrex_fort_module, only : rt => amrex_real
   implicit none
-  real(rt), save :: p_l   = 1.d0
+  ! real(rt), save :: p_l   = 116.5d0
+  ! real(rt), save :: p_r   = 1.d0
+  ! real(rt), save :: rho_l = 8.d0
+  ! real(rt), save :: rho_r = 1.4d0
+  ! real(rt), save :: u_l   = 7.1447095812d0
+  ! real(rt), save :: v_l   = -4.125d0
+  ! real(rt), save :: u_r   = 0.d0
+  ! real(rt), save :: v_r   = 0.d0
+
+  real(rt), save :: p_l   = 1.0d0
   real(rt), save :: p_r   = 0.1d0
-  real(rt), save :: rho_l = 1.d0
+  real(rt), save :: rho_l = 1.0d0
   real(rt), save :: rho_r = 0.125d0
   real(rt), save :: u_l   = 0.d0
+  real(rt), save :: v_l   = 0.d0
   real(rt), save :: u_r   = 0.d0
+  real(rt), save :: v_r   = 0.d0
 end module probdata_module
 
 
@@ -44,26 +55,30 @@ subroutine initdata_f(level, time, lo, hi, u, ulo, uhi, dx, prob_lo) bind(C, nam
   real(rt) :: x, y, Pt, rhot, uxt, vxt
 
   do k = lo(3), hi(3)
-     do j = lo(2), hi(2)
-        do i = lo(1), hi(1)
-           x = prob_lo(1) + (i+0.5d0)*dx(1)
+    do j = lo(2), hi(2)
+      y = prob_lo(2) + (j+0.5d0)*dx(2)
+      do i = lo(1), hi(1)
+        x = prob_lo(1) + (i+0.5d0)*dx(1)
 
-            if (x .lt. 0.5d0) then
-              Pt = p_l
-              rhot = rho_l
-              uxt = u_l
-            else
-                Pt = p_r
-                rhot = rho_r
-                uxt = u_r
-            end if
+        if (y > sqrt(3.d0)*(x-0.25d0)) then
+          Pt = p_l
+          rhot = rho_l
+          uxt = u_l
+          vxt = v_l
+        else
+          Pt = p_r
+          rhot = rho_r
+          uxt = u_r
+          vxt = v_r
+        end if
 
-          u(i,j,k,urho) = rhot
-          u(i,j,k,umx) = rhot * uxt
-          u(i,j,k,umy:umz) = 0.d0
-          u(i,j,k,ueden) = Pt/(gamma - 1.d0) + 0.5d0*rhot*(uxt*uxt + vxt*vxt)
-        end do
-     end do
+        u(i,j,k,urho) = rhot
+        u(i,j,k,umx) = rhot * uxt
+        u(i,j,k,umy) = rhot * vxt
+        u(i,j,k,umz) = 0.d0
+        u(i,j,k,ueden) = Pt/(gamma - 1.d0) + 0.5d0*rhot*(uxt*uxt + vxt*vxt)
+      end do
+    end do
   end do
 
 end subroutine initdata_f
