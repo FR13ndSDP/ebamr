@@ -41,7 +41,7 @@ contains
       fp(1) = tmp;
       fp(2) = tmp * (gm1 * uL + 2.d0 * cL) / gamma;
       fp(3) = tmp * vL;
-      fp(3) = tmp * wL;
+      fp(4) = tmp * wL;
       fp(5) = tmp * ((gm1 * uL + 2.d0 * cL)**2 * 0.5d0 / (gamma**2 - 1.d0) &
         + 0.5d0 * (vL * vL + wL * wL));
     else if (ML <= -1.d0) then

@@ -1,7 +1,14 @@
 
+F90EXE_sources += nc_f.F90
+
 F90EXE_sources += advection_module.F90
 
 F90EXE_sources += flux_split_module.F90
 
 F90EXE_sources += nc_dudt.F90
 
+F90EXE_sources += nc_derive.F90
+
+F90EXE_sources += nc_tagging.F90
+
+F90EXE_sources += nc_estdt.F90

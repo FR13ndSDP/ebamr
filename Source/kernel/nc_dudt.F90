@@ -1,4 +1,4 @@
-module dudt_module
+module nc_dudt_module
 
     use amrex_fort_module, only : rt=>amrex_real
     use nc_module, only : gamma, cv, smallp, smallr, nvar, qvar, qrho, qu, &
@@ -42,24 +42,27 @@ module dudt_module
   
       ! get rhs by summing flux across face (div)
       call compute_divop (lo,hi,qvar,dx,dudt,utlo,uthi, &
-           fx, fxlo, fxhi, fy, fylo, fyhi, fz, fzlo, fzhi)
+           fx, fxlo, fxhi, fy, fylo, fyhi, fz, fzlo, fzhi, dt, level)
   
       call amrex_deallocate(q)
     end subroutine compute_dudt
 
     subroutine compute_divop(lo,hi,ncomp,dx,ut,utlo,uthi, &
-        fx, fxlo, fxhi, fy, fylo, fyhi, fz, fzlo, fzhi)
+        fx, fxlo, fxhi, fy, fylo, fyhi, fz, fzlo, fzhi, dt, level)
         integer, intent(in) :: lo(3),hi(3),ncomp,utlo(3),uthi(3),fxlo(3),fxhi(3), fylo(3),fyhi(3),fzlo(3),fzhi(3)
         real(rt), intent(inout) :: ut( utlo(1): uthi(1), utlo(2): uthi(2), utlo(3): uthi(3), ncomp)
-        real(rt), intent(in   ) :: fx(fxlo(1):fxhi(1),fxlo(2):fxhi(2),fxlo(3):fxhi(3),ncomp)
-        real(rt), intent(in   ) :: fy(fylo(1):fyhi(1),fylo(2):fyhi(2),fylo(3):fyhi(3),ncomp)
-        real(rt), intent(in   ) :: fz(fzlo(1):fzhi(1),fzlo(2):fzhi(2),fzlo(3):fzhi(3),ncomp)
-        real(rt), intent(in) :: dx(3)
+        real(rt), intent(inout) :: fx(fxlo(1):fxhi(1),fxlo(2):fxhi(2),fxlo(3):fxhi(3),ncomp)
+        real(rt), intent(inout) :: fy(fylo(1):fyhi(1),fylo(2):fyhi(2),fylo(3):fyhi(3),ncomp)
+        real(rt), intent(inout) :: fz(fzlo(1):fzhi(1),fzlo(2):fzhi(2),fzlo(3):fzhi(3),ncomp)
+        real(rt), intent(in) :: dx(3), dt
+        integer, intent(in) :: level
     
         integer :: i,j,k,n
-        real(rt) :: dxinv(3)
+        real(rt) :: dxinv(3), coeff
     
         dxinv = 1.d0/dx
+        ! uniform grid
+        coeff = dx(1)*dx(1)*dt/2.d0**level
     
         do       k = lo(3),hi(3)
           do     j = lo(2),hi(2)
@@ -70,6 +73,11 @@ module dudt_module
               end do
           end do
         end do
+
+        ! scale by dt and face area to reflux
+        fx = fx*coeff
+        fy = fy*coeff
+        fz = fz*coeff
     end subroutine compute_divop
 
     subroutine c2prim(lo, hi, u, ulo, uhi, q, qlo, qhi)
@@ -82,7 +90,7 @@ module dudt_module
       do k = lo(3), hi(3)
         do j = lo(2), hi(2)
           do i = lo(1), hi(1)
-            q(i,j,k,qrho) = u(i,j,k,urho)
+            q(i,j,k,qrho) = max(u(i,j,k,urho), smallr)
             rhoinv = 1.d0/q(i,j,k,qrho)
             q(i,j,k,qu) = u(i,j,k,umx) * rhoinv
             q(i,j,k,qv) = u(i,j,k,umy) * rhoinv
@@ -94,4 +102,4 @@ module dudt_module
       end do
     end subroutine c2prim
 
-end module dudt_module
+end module nc_dudt_module

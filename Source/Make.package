@@ -8,12 +8,3 @@ CEXE_sources += NC.cpp
 CEXE_sources += NCBld.cpp
 CEXE_sources += NC_io.cpp
 CEXE_sources += NC_setup.cpp
-
-CEXE_sources += NC_init_eb2.cpp
-
-F90EXE_sources += nc_tagging.F90
-F90EXE_sources += problem.F90
-F90EXE_sources += bc_fill.F90
-F90EXE_sources += nc_f.F90
-F90EXE_sources += nc_derive.F90
-F90EXE_sources += nc_estdt.F90

@@ -17,7 +17,6 @@ extern "C"
     void nc_tag_dengrad(const int* lo, const int* hi,
                            char* tag, const int* tlo, const int* thi,
                            amrex_real* rho, const int* rlo, const int* rhi,
-                           const void* flag, const int* flo, const int* fhi,
                            const amrex_real* dengrad, const char* tagval, const char* clearval);
 
     void nullfill (BL_FORT_FAB_ARG_3D(state),
@@ -33,10 +32,6 @@ extern "C"
                     const int* dlo, const int* dhi,
                     const amrex_real* dx, const amrex_real* glo,
                     const amrex_real* time, const int* bc);
-
-    void nc_init_fort(const int* phys_bc_lo, const int* phys_bc_hi,
-                      int interior, int inflow, int outflow, int symmetry, int slipwall, int noslipwall,
-                      int myproc, const amrex_real* problo, const amrex_real* probhi);
 
     void nc_derpres (BL_FORT_FAB_ARG_3D(der),const int* nvar,
                       const BL_FORT_FAB_ARG_3D(data),const int* ncomp,
@@ -72,7 +67,7 @@ extern "C"
                       amrex_real* fx, const int* fxlo, const int* fxhi,
                       amrex_real* fy, const int* fylo, const int* fyhi,
                       amrex_real* fz, const int* fzlo, const int* fzhi,
-                      const amrex_real* dx);
+                      const amrex_real* dx, const amrex_real* dt, const int* level);
 #ifdef __cplusplus
 }
 #endif

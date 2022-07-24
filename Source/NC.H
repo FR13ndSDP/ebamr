@@ -2,8 +2,7 @@
 #define _NC_H_
 
 #include <AMReX_AmrLevel.H>
-#include <AMReX_EBCellFlag.H>
-#include <AMReX_EBFluxRegister.H>
+#include <AMReX_FluxRegister.H>
 
 using namespace amrex;
 class NC : public amrex::AmrLevel
@@ -106,8 +105,6 @@ public:
 protected:
     static void read_params();
 
-    const amrex::MultiFab &volFrac() const { return *volfrac; }
-
     // call class Amr function to get AmrLevel at lev
     NC &getLevel(int lev) { return dynamic_cast<NC &>(parent->getLevel(lev)); }
 
@@ -115,35 +112,20 @@ protected:
     // and update temprature
     void avgDown();
 
-    // get EB geometry information
-    void buildMetrics();
-
     amrex::Real estTimeStep();
-
+    
     // Compute initial time step.
     amrex::Real initialTimeStep();
 
     // core function
     void compute_dSdt(const amrex::MultiFab &S, amrex::MultiFab &dSdt, amrex::Real dt,
-                      amrex::EBFluxRegister *fr_as_crse, amrex::EBFluxRegister *fr_as_fine);
+                      amrex::FluxRegister *fine, amrex::FluxRegister *current);
 
     // print total momentum and energy
     // only used when verbose>=2
     void printTotal() const;
 
-    const amrex::MultiFab *volfrac;
-    const amrex::MultiCutFab *bndrycent;
-    std::array<const amrex::MultiCutFab *, AMREX_SPACEDIM> areafrac;
-    std::array<const amrex::MultiCutFab *, AMREX_SPACEDIM> facecent;
-
-    amrex::iMultiFab level_mask;
-
-    amrex::EBFluxRegister flux_reg;
-
-    static constexpr int level_mask_interior = 0;   // valid cells
-    static constexpr int level_mask_covered = 1;    // ghost cells covered by valid cells of this level
-    static constexpr int level_mask_notcovered = 2; // ghost cells not covered
-    static constexpr int level_mask_physbnd = 3;    // outside domain
+    amrex::FluxRegister flux_reg;
 
     static constexpr int NUM_GROW = 5;
 
@@ -172,8 +154,6 @@ protected:
     static amrex::Real cfl;
 
     static int do_reflux;
-
-    static int refine_cutcells;
 
     static int refine_max_dengrad_lev;
     static amrex::Real refine_dengrad;

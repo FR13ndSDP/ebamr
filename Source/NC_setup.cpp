@@ -11,7 +11,7 @@ using BndryFunc = StateDescriptor::BndryFunc;
 
 //
 // Components are:
-//  Interior, Inflow, Outflow,  Symmetry,     SlipWall,     NoSlipWall
+//  Interior, Inflow, Outflow,  Symmetry,     SlipWall,     NoSlipWall(adiabatic)
 //
 static int scalar_bc[] =
 {
@@ -92,24 +92,12 @@ NC::variableSetUp ()
 {
     read_params();
 
-    Geometry const* gg = AMReX::top()->getDefaultGeometry();
-
-    nc_init_fort(phys_bc.lo(), phys_bc.hi(),
-                 PhysBCType::interior,
-                 PhysBCType::inflow,
-                 PhysBCType::outflow,
-                 PhysBCType::symmetry,
-                 PhysBCType::slipwall,
-                 PhysBCType::noslipwall,
-                 ParallelDescriptor::MyProc(),
-                 gg->ProbLo(), gg->ProbHi());
-
     bool state_data_extrap = false;
     bool store_in_checkpoint = true;
-    // use eb_cell_cons_interp
+    // use cell_cons_interp
     desc_lst.addDescriptor(State_Type,IndexType::TheCellType(),
                            StateDescriptor::Point,NUM_GROW,NUM_STATE,
-                           &eb_cell_cons_interp,state_data_extrap,store_in_checkpoint);
+                           &cell_cons_interp,state_data_extrap,store_in_checkpoint);
 
     Vector<BCRec>       bcs(NUM_STATE);
     Vector<std::string> name(NUM_STATE);
