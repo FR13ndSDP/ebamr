@@ -557,7 +557,9 @@ void NC::compute_dSdt(const amrex::MultiFab &S, amrex::MultiFab &dSdt, amrex::Re
 
     std::array<FArrayBox,AMREX_SPACEDIM> flux;
 
-    for (MFIter mfi(S, MFItInfo().EnableTiling(hydro_tile_size).SetDynamic(true));
+    // for (MFIter mfi(S, MFItInfo().EnableTiling(hydro_tile_size).SetDynamic(true));
+    //             mfi.isValid(); ++mfi)
+    for (MFIter mfi(S, false);
                 mfi.isValid(); ++mfi)
     {
         const Box& bx = mfi.tilebox();

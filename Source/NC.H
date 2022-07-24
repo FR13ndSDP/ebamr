@@ -37,6 +37,9 @@ public:
     //     return {"HyperCLaw-V1.1"};
     // }
 
+    // Write state for debugging
+    void printState(const MultiFab& mf);
+
     // Write a plotfile to specified directory.
     virtual void writePlotFile(const std::string &dir,
                                std::ostream &os,
