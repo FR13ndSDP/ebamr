@@ -7,10 +7,10 @@ module nc_tagging_module
 
 contains
 
-  subroutine nc_tag_dengrad (lo, hi, tag, tlo, thi, rho, rlo, rhi, flo, fhi, &
+  subroutine nc_tag_dengrad (lo, hi, tag, tlo, thi, rho, rlo, rhi, &
     dengrad, tagval, clearval) bind(c,name='nc_tag_dengrad')
     use iso_c_binding, only : c_char
-    integer, dimension(3), intent(in) :: lo, hi, tlo, thi, rlo, rhi, flo, fhi
+    integer, dimension(3), intent(in) :: lo, hi, tlo, thi, rlo, rhi
     character(kind=c_char), intent(inout) :: tag(tlo(1):thi(1),tlo(2):thi(2),tlo(3):thi(3))
     real(kind=amrex_real),  intent(in)    :: rho(rlo(1):rhi(1),rlo(2):rhi(2),rlo(3):rhi(3))
     real(kind=amrex_real), intent(in) :: dengrad
