@@ -22,6 +22,7 @@ contains
           vz = u(i,j,k,umz)*rhoinv
           p = (gamma-1.d0)*(u(i,j,k,ueden) - 0.5d0*u(i,j,k,urho)*(vx**2+vy**2+vz**2))
           cs = sqrt(gamma*p*rhoinv)
+          cs = 0.d0
           dt = min(dt,dx(1)/(abs(vx)+cs),dx(2)/(abs(vy)+cs),dx(3)/(abs(vz)+cs))
         end do
       end do

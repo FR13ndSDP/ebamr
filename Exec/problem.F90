@@ -1,14 +1,14 @@
 module probdata_module
   use amrex_fort_module, only : rt => amrex_real
   implicit none
-  real(rt), save :: p_l   = 116.5d0
-  real(rt), save :: p_r   = 1.d0
-  real(rt), save :: rho_l = 8.d0
-  real(rt), save :: rho_r = 1.4d0
-  real(rt), save :: u_l   = 7.1447095812d0
-  real(rt), save :: v_l   = -4.125d0
-  real(rt), save :: u_r   = 0.d0
-  real(rt), save :: v_r   = 0.d0
+  ! real(rt), save :: p_l   = 116.5d0
+  ! real(rt), save :: p_r   = 1.d0
+  ! real(rt), save :: rho_l = 8.d0
+  ! real(rt), save :: rho_r = 1.4d0
+  ! real(rt), save :: u_l   = 7.1447095812d0
+  ! real(rt), save :: v_l   = -4.125d0
+  ! real(rt), save :: u_r   = 0.d0
+  ! real(rt), save :: v_r   = 0.d0
 
   ! real(rt), save :: p_l   = 1.0d0
   ! real(rt), save :: p_r   = 0.1d0
@@ -18,6 +18,15 @@ module probdata_module
   ! real(rt), save :: v_l   = 0.d0
   ! real(rt), save :: u_r   = 0.d0
   ! real(rt), save :: v_r   = 0.d0
+
+  real(rt), save :: p_l   = 101000.d0
+  real(rt), save :: p_r   = 101000.d0
+  real(rt), save :: rho_l = 2.28d0
+  real(rt), save :: rho_r = 1.28d0
+  real(rt), save :: u_l   = 0.d0
+  real(rt), save :: v_l   = 0.d0
+  real(rt), save :: u_r   = 50.d0
+  real(rt), save :: v_r   = 0.d0
 end module probdata_module
 
 
@@ -63,7 +72,8 @@ subroutine initdata_f(level, time, lo, hi, u, ulo, uhi, dx, prob_lo) bind(C, nam
 
         ! if (x>0.48d0 .and. x<0.52d0 .and. y>0.48d0 .and. y<0.52d0 .and. z>0.48d0 .and. z<0.52d0) then
         ! if (x<0.5d0) then
-        if (x<1.d0/6.d0+1.d0/sqrt(3.d0)*y) then
+        ! if (x<1.d0/6.d0+1.d0/sqrt(3.d0)*y) then
+        if (y .lt. 0.5d0) then
           Pt = p_l
           rhot = rho_l
           uxt = u_l

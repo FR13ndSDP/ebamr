@@ -24,6 +24,6 @@ module nc_module
   real(rt), parameter, public :: smallp = 1.d-10
   real(rt), parameter, public :: smallr = 1.d-19
 
-  real(rt), parameter, public :: gamma = 1.4d0, cv = 717.5d0, R = 287.d0
+  real(rt), parameter, public :: gamma = 1.4d0, cv = 717.5d0, R = 287.d0, Pr = 0.72d0
   
 end module nc_module

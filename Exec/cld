@@ -1,3 +1,4 @@
 #!/bin/bash
 rm -rf plt*
 rm -f Backtrace*
+rm -f *.h5

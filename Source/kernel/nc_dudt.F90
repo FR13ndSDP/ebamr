@@ -18,33 +18,54 @@ module nc_dudt_module
          u,ulo,uhi,fx,fxlo,fxhi,fy,fylo,fyhi,fz,fzlo,fzhi,dx,dt,level) &
          bind(c,name='compute_dudt')
       use advection_module, only : compute_flux
+      use viscous_module, only : compute_viscous_flux
       integer, dimension(3), intent(in) :: lo,hi,utlo,uthi,ulo,uhi,fxlo,fxhi,fylo,fyhi,fzlo,fzhi
       real(rt), intent(inout) :: dudt(utlo(1):uthi(1),utlo(2):uthi(2),utlo(3):uthi(3),nvar)
       real(rt), intent(in   ) :: u ( ulo(1): uhi(1), ulo(2): uhi(2), ulo(3): uhi(3),nvar)
       real(rt), intent(inout) :: fx(fxlo(1):fxhi(1),fxlo(2):fxhi(2),fxlo(3):fxhi(3),qvar)
       real(rt), intent(inout) :: fy(fylo(1):fyhi(1),fylo(2):fyhi(2),fylo(3):fyhi(3),qvar)
       real(rt), intent(inout) :: fz(fzlo(1):fzhi(1),fzlo(2):fzhi(2),fzlo(3):fzhi(3),qvar)
+
       real(rt), intent(in) :: dx(3), dt
       integer, intent(in) :: level
   
       integer :: qlo(3), qhi(3)
-      real(rt), dimension(:,:,:,:), pointer, contiguous :: q
+      real(rt), dimension(:,:,:,:), pointer, contiguous :: q, fhx, fhy, fhz, fdx, fdy, fdz
 
       ! primitive is grown by nghost_plm
       qlo = lo - nghost_plm
       qhi = hi + nghost_plm
       call amrex_allocate(q, qlo(1),qhi(1), qlo(2),qhi(2), qlo(3),qhi(3), 1,qvar)
-  
+      call amrex_allocate(fhx,lo(1),hi(1)+1,lo(2),hi(2)  ,lo(3),hi(3)  ,1,qvar)
+      call amrex_allocate(fhy,lo(1),hi(1)  ,lo(2),hi(2)+1,lo(3),hi(3)  ,1,qvar)
+      call amrex_allocate(fhz,lo(1),hi(1)  ,lo(2),hi(2)  ,lo(3),hi(3)+1,1,qvar)
+      call amrex_allocate(fdx,lo(1),hi(1)+1,lo(2),hi(2)  ,lo(3),hi(3)  ,1,qvar)
+      call amrex_allocate(fdy,lo(1),hi(1)  ,lo(2),hi(2)+1,lo(3),hi(3)  ,1,qvar)
+      call amrex_allocate(fdz,lo(1),hi(1)  ,lo(2),hi(2)  ,lo(3),hi(3)+1,1,qvar)
+
       call c2prim(qlo, qhi, u, ulo, uhi, q, qlo, qhi)
   
       ! compute face flux
-      call compute_flux(q, qlo, qhi, lo, hi, dx, fx, fy, fz)
-  
+      call compute_flux(q, qlo, qhi, lo, hi, dx, fhx, fhy, fhz)
+      
+      ! compute viscous flux
+      call compute_viscous_flux(q, qlo, qhi, lo, hi, dx, fdx, fdy, fdz)
+
+      fx = fhx+fdx
+      fy = fhy+fdy
+      fz = fhz+fdz
+
       ! get rhs by summing flux across face (div)
       call compute_divop (lo,hi,qvar,dx,dudt,utlo,uthi, &
            fx, fxlo, fxhi, fy, fylo, fyhi, fz, fzlo, fzhi, dt, level)
   
       call amrex_deallocate(q)
+      call amrex_deallocate(fhx)
+      call amrex_deallocate(fhy)
+      call amrex_deallocate(fhz)
+      call amrex_deallocate(fdx)
+      call amrex_deallocate(fdy)
+      call amrex_deallocate(fdz)
     end subroutine compute_dudt
 
     subroutine compute_divop(lo,hi,ncomp,dx,ut,utlo,uthi, &
