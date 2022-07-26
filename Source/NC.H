@@ -159,6 +159,8 @@ protected:
     static amrex::Real refine_dengrad;
 
     static amrex::Vector<amrex::RealBox> refine_boxes;
+
+    static std::string time_integration;
 };
 
 #endif
