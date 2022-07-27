@@ -479,23 +479,23 @@ Real NC::advance(Real time, Real dt, int iteration, int /*ncycle*/)
     {
         // RK3 stage 1
         FillPatch(*this, Sborder, NUM_GROW, time, State_Type, 0, NUM_STATE);
-        compute_dSdt(Sborder, dSdt, dt/3.0, fine, current);
+        compute_dSdt(Sborder, dSdt, Real(dt/6.0), fine, current);
         // U^* = U^n + dt * dUdt^n
         // S_new = 1 * Sborder + dt * dSdt
         MultiFab::LinComb(S_new, 1.0, Sborder, 0, dt, dSdt, 0, 0, NUM_STATE, 0);
 
         // Rk3 stage 2
         // after fillpatch Sborder is U^*
-        FillPatch(*this, Sborder, NUM_GROW, time+2.0/3.0*dt, State_Type, 0, NUM_STATE);
-        compute_dSdt(Sborder, dSdt, dt/3.0, fine, current);
+        FillPatch(*this, Sborder, NUM_GROW, time+dt, State_Type, 0, NUM_STATE);
+        compute_dSdt(Sborder, dSdt, Real(dt/6.0), fine, current);
         // S_new = 0.25 * U^* + 0.75 * U^n + 0.25*dt*dUdt^*
         MultiFab::LinComb(S_new, 0.25, Sborder, 0, 0.75, S_old, 0, 0, NUM_STATE, 0);
         MultiFab::Saxpy(S_new, 0.25*dt, dSdt, 0, 0, NUM_STATE, 0);
 
         // Rk3 stage 3
         // after fillpatch Sborder is U^*
-        FillPatch(*this, Sborder, NUM_GROW, time+dt, State_Type, 0, NUM_STATE);
-        compute_dSdt(Sborder, dSdt, dt/3.0, fine, current);
+        FillPatch(*this, Sborder, NUM_GROW, time+0.25*dt, State_Type, 0, NUM_STATE);
+        compute_dSdt(Sborder, dSdt, Real(2.0*dt/3.0), fine, current);
         MultiFab::LinComb(S_new, 2.0/3.0, Sborder, 0, 1.0/3.0, S_old, 0, 0, NUM_STATE, 0);
         MultiFab::Saxpy(S_new, 2.0/3.0*dt, dSdt, 0, 0, NUM_STATE, 0);
     }
