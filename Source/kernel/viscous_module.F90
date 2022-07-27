@@ -26,7 +26,7 @@ contains
     real(rt) :: dudx, dudy, dudz, dvdx, dvdy, dwdx, dwdz, divu, dTdx
     real(rt) :: dvdz, dwdy, dTdy, dTdz
     real(rt), parameter :: twoThirds = 2.d0/3.d0
-    real(rt) :: mu_0 = 1.716d-05, T_ref = 273.15d0, T_0 = 111d0
+    real(rt) :: mu_0 = 1.716d-5, T_ref = 273.15d0, T_0 = 111.d0
 
     real(rt), dimension(:,:,:), pointer, contiguous :: T, mut, kt
     call amrex_allocate(T,   qd_lo(1), qd_hi(1), qd_lo(2), qd_hi(2), qd_lo(3),qd_hi(3))

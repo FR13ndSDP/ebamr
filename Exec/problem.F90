@@ -25,7 +25,7 @@ module probdata_module
   real(rt), save :: rho_r = 1.28d0
   real(rt), save :: u_l   = 0.d0
   real(rt), save :: v_l   = 0.d0
-  real(rt), save :: u_r   = 50.d0
+  real(rt), save :: u_r   = 100.d0
   real(rt), save :: v_r   = 0.d0
 end module probdata_module
 
