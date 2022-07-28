@@ -9,6 +9,7 @@ static Box the_same_box (const Box& b) { return b; }
 
 using BndryFunc = StateDescriptor::BndryFunc;
 
+// TODO: Add fix temperature wall boudary
 //
 // Components are:
 //  Interior, Inflow, Outflow,  Symmetry,     SlipWall,     NoSlipWall(adiabatic)

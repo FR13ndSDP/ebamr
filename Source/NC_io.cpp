@@ -19,6 +19,7 @@ NC::checkPoint (const std::string& dir, std::ostream& os, VisMF::How how, bool d
     AmrLevel::checkPoint(dir, os, how, dump_old);
 }
 
+// Add proper HDF5 output
 void
 NC::writePlotFile (const std::string& dir, std::ostream& os, VisMF::How how)
 {

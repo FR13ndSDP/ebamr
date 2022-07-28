@@ -459,6 +459,8 @@ Real NC::advance(Real time, Real dt, int iteration, int /*ncycle*/)
         current = &flux_reg;
     }
 
+    // TODO: RK3 is not conservative in AMR
+    // TODO: Use implicit time integration
     if (time_integration == "RK2")
     {
         // RK2 stage 1
