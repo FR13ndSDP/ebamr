@@ -7,6 +7,7 @@ module nc_tagging_module
 
 contains
 
+  ! Bug may occur when tag_dengrad and refine_box are used at the same time
   subroutine nc_tag_dengrad (lo, hi, tag, tlo, thi, rho, rlo, rhi, &
     dengrad, tagval, clearval) bind(c,name='nc_tag_dengrad')
     use iso_c_binding, only : c_char
@@ -30,6 +31,8 @@ contains
           az = MAX(az,ABS(rho(i,j,k) - rho(i,j,k-1)))
           if ( MAX(ax,ay,az) .ge. dengrad ) then
             tag(i,j,k) = tagval
+          else
+            tag(i,j,k) = clearval
           endif
         end do
       end do
