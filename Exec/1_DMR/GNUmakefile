@@ -5,4 +5,4 @@ USE_MPI = TRUE
 USE_OMP = FALSE
 
 include ./Make.package
-include ./Make.NC
+include ../Make.NC

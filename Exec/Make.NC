@@ -1,5 +1,5 @@
 AMREX_HOME ?= ../../../../../amrex
-TOP := ../
+TOP := ../..
 
 EBASE := NC
 

@@ -1,3 +1,0 @@
-
-F90EXE_sources += lid_driven.F90
-F90EXE_sources += lid_bc.F90

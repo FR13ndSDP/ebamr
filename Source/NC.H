@@ -152,14 +152,11 @@ protected:
     static int verbose;
     static amrex::IntVect hydro_tile_size;
     static amrex::Real cfl;
-
     static int do_reflux;
-
+    static int do_gravity;
     static int refine_max_dengrad_lev;
     static amrex::Real refine_dengrad;
-
     static amrex::Vector<amrex::RealBox> refine_boxes;
-
     static std::string time_integration;
 };
 

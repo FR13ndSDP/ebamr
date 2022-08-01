@@ -20,6 +20,7 @@ int       NC::verbose = 0;
 IntVect   NC::hydro_tile_size {AMREX_D_DECL(1024,16,16)};
 Real      NC::cfl       = 0.3;
 int       NC::do_reflux = 1;
+int       NC::do_gravity = 0;
 int       NC::refine_max_dengrad_lev   = -1;
 Real      NC::refine_dengrad           = 1.0e10;
 std::string NC::time_integration       = "RK2";
@@ -79,6 +80,7 @@ NC::initData ()
 
     const Real* dx  = geom.CellSize();
     const Real* prob_lo = geom.ProbLo();
+    const Real* prob_hi = geom.ProbHi();
     MultiFab& S_new = get_new_data(State_Type);
     Real cur_time   = state[State_Type].curTime();
 
@@ -91,7 +93,7 @@ NC::initData ()
       initdata_f(&level, &cur_time,
                    BL_TO_FORTRAN_BOX(box),
                    BL_TO_FORTRAN_ANYD(S_new[mfi]),
-                   dx, prob_lo);
+                   dx, prob_lo, prob_hi);
     }
 }
 
@@ -363,6 +365,8 @@ NC::read_params ()
 
     pp.query("do_reflux", do_reflux);
 
+    pp.query("do_gravity", do_gravity);
+
     pp.query("refine_max_dengrad_lev", refine_max_dengrad_lev);
     pp.query("refine_dengrad", refine_dengrad);
 
@@ -434,8 +438,11 @@ Real NC::advance(Real time, Real dt, int iteration, int /*ncycle*/)
 {
     BL_PROFILE("NC::advance");
 
-    state[State_Type].allocOldData();
-    state[State_Type].swapTimeLevels(dt);
+    for (int i=0; i<NUM_STATE_TYPE; i++)
+    {
+        state[i].allocOldData();
+        state[i].swapTimeLevels(dt);
+    }
 
     MultiFab& S_new = get_new_data(State_Type);
     MultiFab& S_old = get_old_data(State_Type);
@@ -515,11 +522,11 @@ void NC::compute_dSdt(const amrex::MultiFab &S, amrex::MultiFab &dSdt, amrex::Re
     const int ncomp = dSdt.nComp();
 
     std::array<FArrayBox,AMREX_SPACEDIM> flux;
-    MultiFab fluxes[BL_SPACEDIM];
+    MultiFab fluxes[AMREX_SPACEDIM];
 
     if (do_reflux)
     {
-        for (int j = 0; j < BL_SPACEDIM; j++)
+        for (int j = 0; j < AMREX_SPACEDIM; j++)
         {
             BoxArray ba = S.boxArray();
             ba.surroundingNodes(j);
@@ -539,17 +546,16 @@ void NC::compute_dSdt(const amrex::MultiFab &S, amrex::MultiFab &dSdt, amrex::Re
             flux[idim].resize(amrex::surroundingNodes(bx,idim),ncomp);
         }
         compute_dudt(BL_TO_FORTRAN_BOX(bx),
-                            BL_TO_FORTRAN_ANYD(dSdt[mfi]),
-                            BL_TO_FORTRAN_ANYD(S[mfi]),
-                            BL_TO_FORTRAN_ANYD(flux[0]),
-                            BL_TO_FORTRAN_ANYD(flux[1]),
-                            BL_TO_FORTRAN_ANYD(flux[2]),
-                            dx, &dt, &level);
+                     BL_TO_FORTRAN_ANYD(dSdt[mfi]),
+                     BL_TO_FORTRAN_ANYD(S[mfi]),
+                     BL_TO_FORTRAN_ANYD(flux[0]),
+                     BL_TO_FORTRAN_ANYD(flux[1]),
+                     BL_TO_FORTRAN_ANYD(flux[2]),
+                     dx, &dt, &level);
         if (do_reflux) {
-            for (int i = 0; i < BL_SPACEDIM ; i++)
+            for (int i = 0; i < AMREX_SPACEDIM ; i++)
                 fluxes[i][mfi].copy(flux[i],mfi.nodaltilebox(i));
         }
-
     }
     
     if (do_reflux)
@@ -559,13 +565,13 @@ void NC::compute_dSdt(const amrex::MultiFab &S, amrex::MultiFab &dSdt, amrex::Re
         // with the lev/lev-1 interface (and has grid spacing associated with lev-1)
         if (current) {
         // update the lev/lev-1 flux register (index lev)
-            for (int i=0; i<BL_SPACEDIM; i++)
+            for (int i=0; i<AMREX_SPACEDIM; i++)
                 current->FineAdd(fluxes[i],i,0,0,NUM_STATE,1.0);
         }
 
         if (fine) {
         // update the lev+1/lev flux register (index lev+1)
-            for (int i=0; i<BL_SPACEDIM; i++)
+            for (int i=0; i<AMREX_SPACEDIM; i++)
                 fine->CrseInit(fluxes[i],i,0,0,NUM_STATE,-1.0);
         }
     }

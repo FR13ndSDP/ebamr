@@ -11,18 +11,13 @@ extern "C"
     void initdata_f(const int* level, const amrex_real* time,
                     const int* lo, const int* hi,
                     BL_FORT_FAB_ARG_3D(state),
-                    const amrex_real* dx, const amrex_real* problo);
+                    const amrex_real* dx, const amrex_real* problo, const amrex_real* probhi);
 
 
     void nc_tag_dengrad(const int* lo, const int* hi,
                            char* tag, const int* tlo, const int* thi,
                            amrex_real* rho, const int* rlo, const int* rhi,
                            const amrex_real* dengrad, const char* tagval, const char* clearval);
-
-    void nullfill (BL_FORT_FAB_ARG_3D(state),
-                       const int* dlo, const int* dhi,
-                       const amrex_real* dx, const amrex_real* glo,
-                       const amrex_real* time, const int* bc);
 
     void nc_denfill (BL_FORT_FAB_ARG_3D(state),
                     const int* dlo, const int* dhi,

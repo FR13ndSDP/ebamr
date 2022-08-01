@@ -36,5 +36,5 @@
 **/tmp_build_dir/**
 
 # after run
-Exec/Backtrace.*
-Exec/plt*
+**/Backtrace.*
+**/plt*
