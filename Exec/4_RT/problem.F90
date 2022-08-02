@@ -60,7 +60,7 @@ subroutine initdata_f(level, time, lo, hi, u, ulo, uhi, dx, prob_lo, prob_hi) bi
         x = prob_lo(1) + (i+0.5d0)*dx(1)
 
         if (z >= splitz) then
-          Pt = presmid - rho_l * (z-splity)
+          Pt = presmid - rho_l * (z-splitz)
           rhot = rho_l
         else
           Pt = p_base - rho_r * z
