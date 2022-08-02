@@ -43,14 +43,17 @@ subroutine initdata_f(level, time, lo, hi, u, ulo, uhi, dx, prob_lo, prob_hi) bi
   real(rt), intent(in) :: dx(3), prob_lo(3), prob_hi(3)
 
   integer :: i,j,k
-  real(rt) :: x, Pt, rhot, uxt, vxt
+  real(rt) :: x, y, z, Pt, rhot, uxt, vxt
 
   do k = lo(3), hi(3)
+    z = prob_lo(3) + (k+0.5d0)*dx(3)
     do j = lo(2), hi(2)
+      y = prob_lo(2) + (j+0.5d0)*dx(2)
       do i = lo(1), hi(1)
         x = prob_lo(1) + (i+0.5d0)*dx(1)
 
-        if (x<0.5d0) then
+        ! if ((x-0.5d0)**2+(y-0.5d0)**2+(z-0.5d0)**2 <= 0.04d0) then
+        if (x<= 0.5d0) then
           Pt = p_l
           rhot = rho_l
           uxt = u_l

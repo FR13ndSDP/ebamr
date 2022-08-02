@@ -63,6 +63,7 @@ extern "C"
                       amrex_real* fy, const int* fylo, const int* fyhi,
                       amrex_real* fz, const int* fzlo, const int* fzhi,
                       const amrex_real* dx, const amrex_real* dt, const int* level);
+    void init_fort();
 #ifdef __cplusplus
 }
 #endif

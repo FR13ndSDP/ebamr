@@ -468,6 +468,7 @@ Real NC::advance(Real time, Real dt, int iteration, int /*ncycle*/)
 
     // TODO: RK3 is not conservative in AMR
     // TODO: Use implicit time integration
+    // TODO: use spectral deferred correction method
     if (time_integration == "RK2")
     {
         // RK2 stage 1
@@ -503,7 +504,7 @@ Real NC::advance(Real time, Real dt, int iteration, int /*ncycle*/)
 
         // Rk3 stage 3
         // after fillpatch Sborder is U^*
-        FillPatch(*this, Sborder, NUM_GROW, time+0.25*dt, State_Type, 0, NUM_STATE);
+        FillPatch(*this, Sborder, NUM_GROW, time+dt, State_Type, 0, NUM_STATE);
         compute_dSdt(Sborder, dSdt, Real(2.0*dt/3.0), fine, current);
         MultiFab::LinComb(S_new, 2.0/3.0, Sborder, 0, 1.0/3.0, S_old, 0, 0, NUM_STATE, 0);
         MultiFab::Saxpy(S_new, 2.0/3.0*dt, dSdt, 0, 0, NUM_STATE, 0);
@@ -552,6 +553,21 @@ void NC::compute_dSdt(const amrex::MultiFab &S, amrex::MultiFab &dSdt, amrex::Re
                      BL_TO_FORTRAN_ANYD(flux[1]),
                      BL_TO_FORTRAN_ANYD(flux[2]),
                      dx, &dt, &level);
+        
+        if (do_gravity != 0) {
+            const Real g = -9.8;
+            const int irho = Density;
+            const int imz = Zmom;
+            const int irhoE = Eden;
+            auto const& dsdtfab = dSdt.array(mfi); 
+            auto const& sfab = S.array(mfi); 
+            amrex::ParallelFor(bx,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+            {
+                dsdtfab(i,j,k,imz) += g * sfab(i,j,k,irho);
+                dsdtfab(i,j,k,irhoE) += g * sfab(i,j,k,imz);
+            });
+        }
         if (do_reflux) {
             for (int i = 0; i < AMREX_SPACEDIM ; i++)
                 fluxes[i][mfi].copy(flux[i],mfi.nodaltilebox(i));

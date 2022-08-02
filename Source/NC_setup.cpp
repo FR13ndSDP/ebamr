@@ -93,6 +93,9 @@ NC::variableSetUp ()
 {
     read_params();
 
+    // fortran get parmparse
+    init_fort();
+
     bool state_data_extrap = false;
     bool store_in_checkpoint = true;
     // use cell_cons_interp

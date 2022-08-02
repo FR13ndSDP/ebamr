@@ -3,6 +3,7 @@ TOP := ../..
 
 EBASE := NC
 
+# TODO: implement dim compatibility
 DIM := 3
 
 LAZY := TRUE

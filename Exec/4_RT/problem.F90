@@ -3,9 +3,9 @@ module probdata_module
   implicit none
   ! l for up
   ! r for down
-  real(rt), save :: p_base = 5.d0
-  real(rt), save :: rho_l = 2.d0
-  real(rt), save :: rho_r = 0.5d0
+  real(rt), save :: p_base = 101000.d0
+  real(rt), save :: rho_l = 5.d0
+  real(rt), save :: rho_r = 1.29d0
   real(rt), save :: u_l   = 0.d0
   real(rt), save :: v_l   = 0.d0
   real(rt), save :: u_r   = 0.d0

@@ -66,7 +66,7 @@ contains
              flux1(i,j,k,ueden) = -0.5d0*((q(i,j,k,qu)+q(i-1,j,k,qu))*tauxx &
                   &                      +(q(i,j,k,qv)+q(i-1,j,k,qv))*tauxy &
                   &                      +(q(i,j,k,qw)+q(i-1,j,k,qw))*tauxz &
-                  &                    +(kt(i,j,k) +kt(i-1,j,k))*dTdx)
+                  &                      +(kt(i,j,k) +kt(i-1,j,k))*dTdx)
           end do
        end do
     end do
@@ -95,7 +95,7 @@ contains
              flux2(i,j,k,ueden) = -0.5d0*((q(i,j,k,qu)+q(i,j-1,k,qu))*tauxy &
                   &                      +(q(i,j,k,qv)+q(i,j-1,k,qv))*tauyy &
                   &                      +(q(i,j,k,qw)+q(i,j-1,k,qw))*tauyz &
-                  &                    +(kt(i,j,k) +kt(i,j-1,k))*dTdy)
+                  &                      +(kt(i,j,k) +kt(i,j-1,k))*dTdy)
           end do
        end do
     end do

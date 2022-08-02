@@ -2,14 +2,12 @@ module nc_dudt_module
 
     use amrex_fort_module, only : rt=>amrex_real
     use nc_module, only : gamma, cv, smallp, smallr, nvar, qvar, qrho, qu, &
-    qv, qw, qp, urho, ueden, umx, umy, umz
+    qv, qw, qp, urho, ueden, umx, umy, umz, do_reflux, do_visc, refactor_scheme, NND, nghost_plm
     use amrex_mempool_module, only : amrex_allocate, amrex_deallocate
     implicit none
 
     private
-  
-    integer, parameter :: nghost_plm = 2  ! number of ghost cells needed for plm
-  
+
     public:: compute_dudt, compute_divop, c2prim
   
   contains
@@ -47,13 +45,20 @@ module nc_dudt_module
   
       ! compute face flux
       call compute_flux(q, qlo, qhi, lo, hi, dx, fhx, fhy, fhz)
-      
-      ! compute viscous flux
-      call compute_viscous_flux(q, qlo, qhi, lo, hi, dx, fdx, fdy, fdz)
+      fx = fhx
+      fy = fhy
+      fz = fhz
 
-      fx = fhx+fdx
-      fy = fhy+fdy
-      fz = fhz+fdz
+      ! compute viscous flux
+      if (do_visc) then
+        call compute_viscous_flux(q, qlo, qhi, lo, hi, dx, fdx, fdy, fdz)
+        fx = fx + fdx
+        fy = fy + fdy
+        fz = fz + fdz
+        print *, "visc percent :", max(maxval(abs(fdx))/maxval(abs(fx)), &
+                                       max(maxval(abs(fdy))/maxval(abs(fy)), &
+                                       maxval(abs(fdz))/maxval(abs(fz))))
+      end if
 
       ! get rhs by summing flux across face (div)
       call compute_divop (lo,hi,qvar,dx,dudt,utlo,uthi, &
@@ -96,9 +101,11 @@ module nc_dudt_module
         end do
 
         ! scale by dt and face area to reflux
-        fx = fx*coeff
-        fy = fy*coeff
-        fz = fz*coeff
+        if (do_reflux) then
+          fx = fx*coeff
+          fy = fy*coeff
+          fz = fz*coeff
+        endif
     end subroutine compute_divop
 
     subroutine c2prim(lo, hi, u, ulo, uhi, q, qlo, qhi)
