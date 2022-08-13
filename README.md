@@ -1,2 +1,2 @@
 # ebamr
-Using Embedded Boundary Method and AMR to solve discreted equations. 
+Using Embedded Boundary Method and AMR to solve discreted equations.

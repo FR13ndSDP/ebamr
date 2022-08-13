@@ -2,7 +2,8 @@
 #define _NC_H_
 
 #include <AMReX_AmrLevel.H>
-#include <AMReX_FluxRegister.H>
+#include <AMReX_EBFluxRegister.H>
+#include <AMReX_EBCellFlag.H>
 
 using namespace amrex;
 class NC : public amrex::AmrLevel
@@ -97,6 +98,8 @@ public:
                           int ngrow = 0) override;
 
     static int numGrow() { return NUM_GROW; }
+    
+    const amrex::MultiFab& volFrac() const { return *volfrac; }
 
     static void variableSetUp();
 
@@ -112,6 +115,9 @@ protected:
     // and update temprature
     void avgDown();
 
+    // build geometry information
+    void buildMetrics();
+
     amrex::Real estTimeStep();
     
     // Compute initial time step.
@@ -119,13 +125,26 @@ protected:
 
     // core function
     void compute_dSdt(const amrex::MultiFab &S, amrex::MultiFab &dSdt, amrex::Real dt,
-                      amrex::FluxRegister *fine, amrex::FluxRegister *current);
+                      amrex::EBFluxRegister *fine, amrex::EBFluxRegister *current);
 
     // print total momentum and energy
     // only used when verbose>=2
     void printTotal() const;
 
-    amrex::FluxRegister flux_reg;
+    // geometric properties
+    const amrex::MultiFab* volfrac;
+    const amrex::MultiCutFab* bndrycent;
+    std::array<const amrex::MultiCutFab*,AMREX_SPACEDIM> areafrac;
+    std::array<const amrex::MultiCutFab*,AMREX_SPACEDIM> facecent;
+
+    // cell state descriptor
+    amrex::iMultiFab level_mask;
+    static constexpr int level_mask_interior   = 0; // valid cells
+    static constexpr int level_mask_covered    = 1; // ghost cells covered by valid cells of this level
+    static constexpr int level_mask_notcovered = 2; // ghost cells not covered
+    static constexpr int level_mask_physbnd    = 3; // outside domain
+
+    amrex::EBFluxRegister flux_reg;
 
     static constexpr int NUM_GROW = 5;
 

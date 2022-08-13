@@ -55,9 +55,9 @@ module nc_dudt_module
         fx = fx + fdx
         fy = fy + fdy
         fz = fz + fdz
-        print *, "visc percent :", max(maxval(abs(fdx))/maxval(abs(fx)), &
-                                       max(maxval(abs(fdy))/maxval(abs(fy)), &
-                                       maxval(abs(fdz))/maxval(abs(fz))))
+        ! print *, "visc percent :", max(maxval(abs(fdx))/maxval(abs(fx)), &
+        !                                max(maxval(abs(fdy))/maxval(abs(fy)), &
+        !                                maxval(abs(fdz))/maxval(abs(fz))))
       end if
 
       ! get rhs by summing flux across face (div)

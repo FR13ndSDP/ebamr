@@ -17,7 +17,7 @@ nc.hi_bc       =  2   0   0
 
 nc.cfl = 0.3  # cfl number for hyperbolic system
 
-nc.v = 1
+nc.v = 2
 amr.v = 1
 
 # LOAD BALANCE
@@ -50,5 +50,9 @@ nc.refine_max_dengrad_lev = 2
 nc.do_reflux = 1
 # nc.hydro_tile_size = 256 256 256
 nc.time_integration = RK2
+nc.do_visc = 0
+
+# EB parameters
+eb2.geom_type = none
 
 amrex.fpe_trap_invalid=1 # floating point exception trapping

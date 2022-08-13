@@ -4,6 +4,7 @@
         "random": "cpp",
         "optional": "cpp",
         "limits": "cpp",
-        "thread": "cpp"
+        "thread": "cpp",
+        "array": "cpp"
     }
 }

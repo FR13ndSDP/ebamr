@@ -8,3 +8,4 @@ CEXE_sources += NC.cpp
 CEXE_sources += NCBld.cpp
 CEXE_sources += NC_io.cpp
 CEXE_sources += NC_setup.cpp
+CEXE_sources += NC_geom.cpp

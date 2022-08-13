@@ -11,6 +11,10 @@
 using namespace amrex;
 
 #if __cplusplus < 201703L
+constexpr int NC::level_mask_interior;
+constexpr int NC::level_mask_covered;
+constexpr int NC::level_mask_notcovered;
+constexpr int NC::level_mask_physbnd;
 constexpr int NC::NUM_GROW;
 #endif
 
@@ -38,8 +42,13 @@ NC::NC (Amr&            papa,
     : AmrLevel(papa,lev,level_geom,bl,dm,time)
 {
     if (do_reflux && level > 0) {
-        flux_reg.define(bl, dm, papa.refRatio(level-1), level, NUM_STATE);
+        flux_reg.define(bl, papa.boxArray(level-1),
+                        dm, papa.DistributionMap(level-1),
+                        level_geom, papa.Geom(level-1),
+                        papa.refRatio(level-1), level, NUM_STATE);
     }
+
+    buildMetrics();
 }
 
 NC::~NC ()
@@ -95,6 +104,30 @@ NC::initData ()
                    BL_TO_FORTRAN_ANYD(S_new[mfi]),
                    dx, prob_lo, prob_hi);
     }
+}
+
+void NC::buildMetrics()
+{
+    // make sure dx == dy == dz
+    const Real* dx = geom.CellSize();
+    if (std::abs(dx[0]-dx[1]) > 1.e-12*dx[0] || std::abs(dx[0]-dx[2]) > 1.e-12*dx[0]) {
+        amrex::Abort("CNS: must have dx == dy == dz\n");
+    }
+
+    const auto& ebfactory = dynamic_cast<EBFArrayBoxFactory const&>(Factory());
+
+    volfrac = &(ebfactory.getVolFrac());
+    bndrycent = &(ebfactory.getBndryCent());
+    areafrac = ebfactory.getAreaFrac();
+    facecent = ebfactory.getFaceCent();
+
+    level_mask.clear();
+    level_mask.define(grids,dmap,1,1);
+    level_mask.BuildMask(geom.Domain(), geom.periodicity(),
+                         level_mask_covered,
+                         level_mask_notcovered,
+                         level_mask_physbnd,
+                         level_mask_interior);
 }
 
 void
@@ -225,7 +258,8 @@ NC::post_timestep (int iteration)
     if (do_reflux && level < parent->finestLevel()) {
         NC& fine_level = getLevel(level+1);
         MultiFab& S_crse = get_new_data(State_Type);
-        fine_level.flux_reg.Reflux(S_crse, 1.0, 0, 0, NUM_STATE, geom);
+        MultiFab& S_fine = fine_level.get_new_data(State_Type);
+        fine_level.flux_reg.Reflux(S_crse, *volfrac, S_fine, *fine_level.volfrac);
     }
 
     if (level < parent->finestLevel()) {
@@ -393,7 +427,10 @@ NC::avgDown ()
     MultiFab& S_crse =          get_new_data(State_Type);
     MultiFab& S_fine = fine_lev.get_new_data(State_Type);
 
-    amrex::average_down(S_fine, S_crse, 0, S_fine.nComp(), fine_ratio);
+    MultiFab volume(S_fine.boxArray(), S_fine.DistributionMap(), 1, 0);
+    volume.setVal(1.0);
+    amrex::EB_average_down(S_fine, S_crse, volume, fine_lev.volFrac(),
+                           0, S_fine.nComp(), fine_ratio);
 }
 
 Real NC::estTimeStep()
@@ -451,14 +488,14 @@ Real NC::advance(Real time, Real dt, int iteration, int /*ncycle*/)
     // state with ghost cell
     MultiFab Sborder(grids, dmap, NUM_STATE, NUM_GROW, MFInfo(), Factory());
 
-    FluxRegister* fine = nullptr; 
-    FluxRegister* current = nullptr; 
+    EBFluxRegister* fine = nullptr; 
+    EBFluxRegister* current = nullptr; 
 
     if (do_reflux && level < parent->finestLevel())
     {
         NC& fine_level = getLevel(level+1);
         fine = &fine_level.flux_reg;
-        fine->setVal(0.0);
+        fine->reset();
     }
 
     if (do_reflux && level > 0)
@@ -515,7 +552,7 @@ Real NC::advance(Real time, Real dt, int iteration, int /*ncycle*/)
 // compute rhs flux
 // bx with no ghost cell
 // flux is defined on box face
-void NC::compute_dSdt(const amrex::MultiFab &S, amrex::MultiFab &dSdt, amrex::Real dt, amrex::FluxRegister *fine, amrex::FluxRegister *current)
+void NC::compute_dSdt(const amrex::MultiFab &S, amrex::MultiFab &dSdt, amrex::Real dt, amrex::EBFluxRegister *fine, amrex::EBFluxRegister *current)
 {
     BL_PROFILE("NC::compute_dSdt");
 
@@ -523,17 +560,6 @@ void NC::compute_dSdt(const amrex::MultiFab &S, amrex::MultiFab &dSdt, amrex::Re
     const int ncomp = dSdt.nComp();
 
     std::array<FArrayBox,AMREX_SPACEDIM> flux;
-    MultiFab fluxes[AMREX_SPACEDIM];
-
-    if (do_reflux)
-    {
-        for (int j = 0; j < AMREX_SPACEDIM; j++)
-        {
-            BoxArray ba = S.boxArray();
-            ba.surroundingNodes(j);
-            fluxes[j].define(ba, dmap, NUM_STATE, 0);
-        }
-    }
 
     for (MFIter mfi(S, MFItInfo().EnableTiling(hydro_tile_size).SetDynamic(true));
                 mfi.isValid(); ++mfi)
@@ -568,27 +594,24 @@ void NC::compute_dSdt(const amrex::MultiFab &S, amrex::MultiFab &dSdt, amrex::Re
                 dsdtfab(i,j,k,irhoE) += g * sfab(i,j,k,imz);
             });
         }
-        if (do_reflux) {
-            for (int i = 0; i < AMREX_SPACEDIM ; i++)
-                fluxes[i][mfi].copy(flux[i],mfi.nodaltilebox(i));
-        }
-    }
-    
-    if (do_reflux)
-    {
-        // the flux registers from the coarse or fine grid perspective
-        // NOTE: the flux register associated with flux_reg[lev] is associated
-        // with the lev/lev-1 interface (and has grid spacing associated with lev-1)
-        if (current) {
-        // update the lev/lev-1 flux register (index lev)
-            for (int i=0; i<AMREX_SPACEDIM; i++)
-                current->FineAdd(fluxes[i],i,0,0,NUM_STATE,1.0);
-        }
 
-        if (fine) {
-        // update the lev+1/lev flux register (index lev+1)
-            for (int i=0; i<AMREX_SPACEDIM; i++)
-                fine->CrseInit(fluxes[i],i,0,0,NUM_STATE,-1.0);
+        // TODO: reflux for EB is too complicated!
+        if (do_reflux)
+        {
+            // the flux registers from the coarse or fine grid perspective
+            // NOTE: the flux register associated with flux_reg[lev] is associated
+            // with the lev/lev-1 interface (and has grid spacing associated with lev-1)
+            if (current) {
+            // update the lev/lev-1 flux register (index lev)
+                for (int i=0; i<AMREX_SPACEDIM; i++)
+                    current->FineAdd(mfi, {&flux[0], &flux[1], &flux[2]}, dx, dt, RunOn::Cpu);
+            }
+
+            if (fine) {
+            // update the lev+1/lev flux register (index lev+1)
+                for (int i=0; i<AMREX_SPACEDIM; i++)
+                    fine->CrseAdd(mfi, {&flux[0], &flux[1], &flux[2]}, dx, dt, RunOn::Cpu);
+            }
         }
     }
 }

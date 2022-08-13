@@ -7,6 +7,7 @@
 #include <NC.H>
 
 using namespace amrex;
+void initialize_Geom (const Geometry& geom, const int required_level, const int max_level);
 
 amrex::LevelBld* getLevelBld ();
 
@@ -48,6 +49,9 @@ int main (int argc, char* argv[])
         timer_init = amrex::second();
 
         Amr amr(getLevelBld());
+        AmrLevel::SetEBSupportLevel(EBSupport::full);
+        AmrLevel::SetEBMaxGrowCells(NC::numGrow(), 4, 2);
+        initialize_Geom(amr.Geom(amr.maxLevel()), amr.maxLevel(), amr.maxLevel());
 
         amr.init(strt_time,stop_time);
 
