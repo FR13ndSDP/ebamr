@@ -14,3 +14,5 @@ F90EXE_sources += nc_tagging.F90
 F90EXE_sources += nc_estdt.F90
 
 F90EXE_sources += viscous_module.F90
+
+F90EXE_sources += nc_ibm.F90

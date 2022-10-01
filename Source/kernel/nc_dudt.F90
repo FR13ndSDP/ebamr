@@ -88,6 +88,7 @@ module nc_dudt_module
     
         dxinv = 1.d0/dx
         ! uniform grid
+        ! TODO: varify this coefficient
         coeff = dx(1)*dx(1)*dt/2.d0**level
     
         do       k = lo(3),hi(3)
@@ -102,9 +103,9 @@ module nc_dudt_module
 
         ! scale by dt and face area to reflux
         if (do_reflux) then
-          fx = fx*coeff
-          fy = fy*coeff
-          fz = fz*coeff
+          ! fx = fx*coeff
+          ! fy = fy*coeff
+          ! fz = fz*coeff
         endif
     end subroutine compute_divop
 

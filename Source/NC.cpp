@@ -2,10 +2,11 @@
 #include <NC.H>
 #include <NC_F.H>
 
-#include <AMReX_MultiFabUtil.H>
+#include <AMReX_EBMultiFabUtil.H>
 #include <AMReX_ParmParse.H>
-#include <AMReX_FArrayBox.H>
-
+#include <AMReX_EBFArrayBox.H>
+#include <AMReX_EBAmrUtil.H>
+#include <AMReX_MultiCutFab.H>
 #include <climits>
 
 using namespace amrex;
@@ -359,17 +360,25 @@ NC::errorEst (TagBoxArray& tags, int, int, Real time, int, int)
         const char   tagval = TagBox::SET;
         const char clearval = TagBox::CLEAR;
 
+        auto const& fact = dynamic_cast<EBFArrayBoxFactory const&>(S_new.Factory());
+        auto const& flags = fact.getMultiEBCellFlagFab();
+
 #ifdef AMREX_USE_OMP
 #pragma omp parallel
 #endif
         for (MFIter mfi(*rho,true); mfi.isValid(); ++mfi)
         {
             const Box& bx = mfi.tilebox();
+            const auto& flag = flags[mfi];
 
-            nc_tag_dengrad(BL_TO_FORTRAN_BOX(bx),
-                                BL_TO_FORTRAN_ANYD(tags[mfi]),
-                                BL_TO_FORTRAN_ANYD((*rho)[mfi]),
-                                &refine_dengrad, &tagval, &clearval);
+            if (flag.getType(bx) != FabType::covered)
+            {
+                nc_tag_dengrad(BL_TO_FORTRAN_BOX(bx),
+                                    BL_TO_FORTRAN_ANYD(tags[mfi]),
+                                    BL_TO_FORTRAN_ANYD((*rho)[mfi]),
+                                    BL_TO_FORTRAN_ANYD(flag),
+                                    &refine_dengrad, &tagval, &clearval);
+            }
         }
     }
 }
@@ -442,6 +451,9 @@ Real NC::estTimeStep()
     const Real* dx = geom.CellSize();
     const MultiFab& S = get_new_data(State_Type);
 
+    auto const& fact = dynamic_cast<EBFArrayBoxFactory const&>(S.Factory());
+    auto const& flags = fact.getMultiEBCellFlagFab();
+
 #ifdef AMREX_USE_OMP
 #pragma omp parallel reduction(min:estdt)
 #endif
@@ -450,9 +462,15 @@ Real NC::estTimeStep()
         for (MFIter mfi(S, true); mfi.isValid(); ++mfi)
         {
             const Box& bx = mfi.tilebox();
-            nc_estdt(BL_TO_FORTRAN_BOX(bx),
-                        BL_TO_FORTRAN_ANYD(S[mfi]),
-                        dx, &dt);
+
+            const auto& flag = flags[mfi];
+            
+            if (flag.getType(bx) != FabType::covered)
+            {
+                nc_estdt(BL_TO_FORTRAN_BOX(bx),
+                            BL_TO_FORTRAN_ANYD(S[mfi]),
+                            dx, &dt);
+            }
         }
         estdt = std::min(estdt, dt);
     }
@@ -559,58 +577,139 @@ void NC::compute_dSdt(const amrex::MultiFab &S, amrex::MultiFab &dSdt, amrex::Re
     const Real* dx = geom.CellSize();
     const int ncomp = dSdt.nComp();
 
-    std::array<FArrayBox,AMREX_SPACEDIM> flux;
+    auto const& fact = dynamic_cast<EBFArrayBoxFactory const&>(S.Factory());
+    auto const& flags = fact.getMultiEBCellFlagFab();
 
-    for (MFIter mfi(S, MFItInfo().EnableTiling(hydro_tile_size).SetDynamic(true));
-                mfi.isValid(); ++mfi)
+#ifdef AMREX_USE_OMP
+#pragma omp parallel
+#endif
     {
-        const Box& bx = mfi.tilebox();
+        std::array<FArrayBox,AMREX_SPACEDIM> flux;
+        FArrayBox dm_as_fine(Box::TheUnitBox(), ncomp);
+        FArrayBox fab_drho_as_crse(Box::TheUnitBox(), ncomp);
+        IArrayBox fab_rrflag_as_crse(Box::TheUnitBox());
 
-        // flux is used to store centroid flux needed for reflux
-        // for flux_x in x direction is nodal, in other directions centroid
-        // for flux_y in y ...
-        for (int idim=0; idim < AMREX_SPACEDIM; ++idim) {
-            flux[idim].resize(amrex::surroundingNodes(bx,idim),ncomp);
-        }
-        compute_dudt(BL_TO_FORTRAN_BOX(bx),
-                     BL_TO_FORTRAN_ANYD(dSdt[mfi]),
-                     BL_TO_FORTRAN_ANYD(S[mfi]),
-                     BL_TO_FORTRAN_ANYD(flux[0]),
-                     BL_TO_FORTRAN_ANYD(flux[1]),
-                     BL_TO_FORTRAN_ANYD(flux[2]),
-                     dx, &dt, &level);
-        
-        if (do_gravity != 0) {
-            const Real g = -9.8;
-            const int irho = Density;
-            const int imz = Zmom;
-            const int irhoE = Eden;
-            auto const& dsdtfab = dSdt.array(mfi); 
-            auto const& sfab = S.array(mfi); 
-            amrex::ParallelFor(bx,
-            [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-            {
-                dsdtfab(i,j,k,imz) += g * sfab(i,j,k,irho);
-                dsdtfab(i,j,k,irhoE) += g * sfab(i,j,k,imz);
-            });
-        }
-
-        // TODO: reflux for EB is too complicated!
-        if (do_reflux)
+        for (MFIter mfi(S, MFItInfo().EnableTiling(hydro_tile_size).SetDynamic(true));
+                    mfi.isValid(); ++mfi)
         {
-            // the flux registers from the coarse or fine grid perspective
-            // NOTE: the flux register associated with flux_reg[lev] is associated
-            // with the lev/lev-1 interface (and has grid spacing associated with lev-1)
-            if (current) {
-            // update the lev/lev-1 flux register (index lev)
-                for (int i=0; i<AMREX_SPACEDIM; i++)
-                    current->FineAdd(mfi, {&flux[0], &flux[1], &flux[2]}, dx, dt, RunOn::Cpu);
-            }
+            const Box& bx = mfi.tilebox();
 
-            if (fine) {
-            // update the lev+1/lev flux register (index lev+1)
-                for (int i=0; i<AMREX_SPACEDIM; i++)
-                    fine->CrseAdd(mfi, {&flux[0], &flux[1], &flux[2]}, dx, dt, RunOn::Cpu);
+            const auto& flag = flags[mfi];
+
+            if (flag.getType(bx) == FabType::covered) {
+                dSdt[mfi].setVal<RunOn::Host>(0.0, bx , 0, ncomp);
+            } else {
+                // flux is used to store centroid flux needed for reflux
+                // for flux_x in x direction is nodal, in other directions centroid
+                // for flux_y in y ...
+                for (int idim=0; idim < AMREX_SPACEDIM; ++idim) {
+                    flux[idim].resize(amrex::surroundingNodes(bx,idim),ncomp);
+                }
+
+                // no cut cell around
+                if (flag.getType(amrex::grow(bx,1)) == FabType::regular)
+                {
+                    compute_dudt(BL_TO_FORTRAN_BOX(bx),
+                                BL_TO_FORTRAN_ANYD(dSdt[mfi]),
+                                BL_TO_FORTRAN_ANYD(S[mfi]),
+                                BL_TO_FORTRAN_ANYD(flux[0]),
+                                BL_TO_FORTRAN_ANYD(flux[1]),
+                                BL_TO_FORTRAN_ANYD(flux[2]),
+                                dx, &dt, &level);
+                    
+                    if (do_gravity != 0) {
+                        const Real g = -9.8;
+                        const int irho = Density;
+                        const int imz = Zmom;
+                        const int irhoE = Eden;
+                        auto const& dsdtfab = dSdt.array(mfi); 
+                        auto const& sfab = S.array(mfi); 
+                        amrex::ParallelFor(bx,
+                        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+                        {
+                            dsdtfab(i,j,k,imz) += g * sfab(i,j,k,irho);
+                            dsdtfab(i,j,k,irhoE) += g * sfab(i,j,k,imz);
+                        });
+                    }
+
+                    // TODO: reflux for EB is too complicated!
+                    if (do_reflux)
+                    {
+                        // the flux registers from the coarse or fine grid perspective
+                        // NOTE: the flux register associated with flux_reg[lev] is associated
+                        // with the lev/lev-1 interface (and has grid spacing associated with lev-1)
+                        if (current) {
+                        // update the lev/lev-1 flux register (index lev)
+                            for (int i=0; i<AMREX_SPACEDIM; i++)
+                                current->FineAdd(mfi, {&flux[0], &flux[1], &flux[2]}, dx, dt, RunOn::Cpu);
+                        }
+
+                        if (fine) {
+                        // update the lev+1/lev flux register (index lev+1)
+                            for (int i=0; i<AMREX_SPACEDIM; i++)
+                                fine->CrseAdd(mfi, {&flux[0], &flux[1], &flux[2]}, dx, dt, RunOn::Cpu);
+                        }
+                    }
+                }
+                else
+                {
+                    // cut cells and its neighbor
+
+                    FArrayBox* p_drho_as_crse = (fine) ?
+                            fine->getCrseData(mfi) : &fab_drho_as_crse;
+                    const IArrayBox* p_rrflag_as_crse = (fine) ?
+                        fine->getCrseFlag(mfi) : &fab_rrflag_as_crse;
+
+                    if (current) {
+                        dm_as_fine.resize(amrex::grow(bx,1),ncomp);
+                    }
+
+                    int as_fine = (fine != nullptr);
+                    int as_crse = (current != nullptr);
+
+                    (*areafrac[0])[mfi];
+                    eb_compute_dudt(BL_TO_FORTRAN_BOX(bx),
+                                    BL_TO_FORTRAN_ANYD(dSdt[mfi]),
+                                    BL_TO_FORTRAN_ANYD(S[mfi]),
+                                    BL_TO_FORTRAN_ANYD(flux[0]),
+                                    BL_TO_FORTRAN_ANYD(flux[1]),
+                                    BL_TO_FORTRAN_ANYD(flux[2]),
+                                    BL_TO_FORTRAN_ANYD(flag),
+                                    BL_TO_FORTRAN_ANYD((*volfrac)[mfi]),
+                                    BL_TO_FORTRAN_ANYD((*bndrycent)[mfi]),
+                                    BL_TO_FORTRAN_ANYD((*areafrac[0])[mfi]),
+                                    BL_TO_FORTRAN_ANYD((*areafrac[1])[mfi]),
+                                    BL_TO_FORTRAN_ANYD((*areafrac[2])[mfi]),
+                                    BL_TO_FORTRAN_ANYD((*facecent[0])[mfi]),
+                                    BL_TO_FORTRAN_ANYD((*facecent[1])[mfi]),
+                                    BL_TO_FORTRAN_ANYD((*facecent[2])[mfi]),
+                                    &as_fine,
+                                    BL_TO_FORTRAN_ANYD(*p_drho_as_crse),
+                                    BL_TO_FORTRAN_ANYD(*p_rrflag_as_crse),
+                                    &as_crse,
+                                    BL_TO_FORTRAN_ANYD(dm_as_fine),
+                                    BL_TO_FORTRAN_ANYD(level_mask[mfi]),
+                                    dx, &dt,&level);
+
+                    if (fine) {
+                        fine->CrseAdd(mfi, {&flux[0],&flux[1],&flux[2]}, dx,dt,
+                                            (*volfrac)[mfi],
+                                            {&((*areafrac[0])[mfi]),
+                                             &((*areafrac[1])[mfi]),
+                                             &((*areafrac[2])[mfi])},
+                                            RunOn::Cpu);
+                    }
+
+                    if (current) {
+                        current->FineAdd(mfi, {&flux[0],&flux[1],&flux[2]}, dx,dt,
+                                            (*volfrac)[mfi],
+                                            {&((*areafrac[0])[mfi]),
+                                             &((*areafrac[1])[mfi]),
+                                             &((*areafrac[2])[mfi])},
+                                            dm_as_fine,
+                                            RunOn::Cpu);
+                    }
+                }
             }
         }
     }
