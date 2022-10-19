@@ -640,13 +640,13 @@ void NC::compute_dSdt(const amrex::MultiFab &S, amrex::MultiFab &dSdt, amrex::Re
                         // with the lev/lev-1 interface (and has grid spacing associated with lev-1)
                         if (current) {
                         // update the lev/lev-1 flux register (index lev)
-                            for (int i=0; i<AMREX_SPACEDIM; i++)
+                            // for (int i=0; i<AMREX_SPACEDIM; i++)
                                 current->FineAdd(mfi, {&flux[0], &flux[1], &flux[2]}, dx, dt, RunOn::Cpu);
                         }
 
                         if (fine) {
                         // update the lev+1/lev flux register (index lev+1)
-                            for (int i=0; i<AMREX_SPACEDIM; i++)
+                            // for (int i=0; i<AMREX_SPACEDIM; i++)
                                 fine->CrseAdd(mfi, {&flux[0], &flux[1], &flux[2]}, dx, dt, RunOn::Cpu);
                         }
                     }
