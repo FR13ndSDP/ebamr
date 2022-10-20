@@ -14,7 +14,7 @@ module nc_module
   integer, save, public :: refactor_scheme = 1
   integer, parameter, public :: NND = 1
   integer, save, public :: nghost_plm = 2
-  integer, save, public :: nghost_eb  =2
+  integer, parameter, public :: nextra_eb  =2
   ! do reflux or not
   logical, save, public :: do_reflux = .false.
   

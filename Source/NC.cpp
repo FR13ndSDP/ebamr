@@ -30,6 +30,7 @@ int       NC::refine_max_dengrad_lev   = -1;
 Real      NC::refine_dengrad           = 1.0e10;
 std::string NC::time_integration       = "RK2";
 Vector<RealBox> NC::refine_boxes;
+int       NC::refine_cutcells = 1;
 
 NC::NC ()
 {}
@@ -324,6 +325,11 @@ NC::errorEst (TagBoxArray& tags, int, int, Real time, int, int)
 {
     BL_PROFILE("NC::errorEst()");
 
+    if (refine_cutcells) {
+        const MultiFab& S_new = get_new_data(State_Type);
+        amrex::TagCutCells(tags, S_new);
+    }
+
     if (!refine_boxes.empty())
     {
         const Real* problo = geom.ProbLo();
@@ -412,6 +418,7 @@ NC::read_params ()
 
     pp.query("refine_max_dengrad_lev", refine_max_dengrad_lev);
     pp.query("refine_dengrad", refine_dengrad);
+    pp.query("refine_cutcells", refine_cutcells);
 
     int irefbox = 0;
     Vector<Real> refboxlo, refboxhi;
@@ -667,7 +674,6 @@ void NC::compute_dSdt(const amrex::MultiFab &S, amrex::MultiFab &dSdt, amrex::Re
                     int as_fine = (fine != nullptr);
                     int as_crse = (current != nullptr);
 
-                    (*areafrac[0])[mfi];
                     eb_compute_dudt(BL_TO_FORTRAN_BOX(bx),
                                     BL_TO_FORTRAN_ANYD(dSdt[mfi]),
                                     BL_TO_FORTRAN_ANYD(S[mfi]),
