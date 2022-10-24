@@ -114,10 +114,10 @@ contains
 
     call compute_eb_divop(lo,hi,5,dx,dt,fhx,lfxlo,lfxhi,fhy,lfylo,lfyhi,fhz,lfzlo,lfzhi,&
       fx, fxlo, fxhi, fy, fylo, fyhi, fz, fzlo, fzhi, &
-      dudt,utlo,uthi, q,qlo,qhi, lambda, mu, xi, clo, chi, &
+      dudt,utlo,uthi, q,qlo,qhi, &
       divc, optmp, rediswgt, dvlo,dvhi, &
       dm,dmlo,dmhi, &
-      volfrac,vlo,vhi, bcent,blo,bhi, &
+      volfrac,vlo,vhi, &
       apx,axlo,axhi,apy,aylo,ayhi,apz,azlo,azhi, &
       centx(:,:,:,1),cxlo,cxhi, centx(:,:,:,2),cxlo,cxhi, &
       centy(:,:,:,1),cylo,cyhi, centy(:,:,:,2),cylo,cyhi, &
@@ -154,11 +154,9 @@ contains
     fctrdz, fczlo, fczhi, &
     ebdivop, oplo, ophi, &
     q, qlo, qhi, &
-    lam, mu, xi, clo, chi, &
     divc, optmp, rediswgt, dvlo, dvhi, &
     delm, dmlo, dmhi, &
     vfrac, vlo, vhi, &
-    bcent, blo, bhi, &
     apx, axlo, axhi, &
     apy, aylo, ayhi, &
     apz, azlo, azhi, &
@@ -182,7 +180,7 @@ contains
     integer, intent(in), dimension(3) :: lo, hi, fxlo,fxhi,fylo,fyhi,fzlo,fzhi,oplo,ophi,&
       dvlo,dvhi,dmlo,dmhi,axlo,axhi,aylo,ayhi,azlo,azhi,cxylo,cxyhi,cxzlo,cxzhi,&
       cyxlo,cyxhi,cyzlo,cyzhi,czxlo,czxhi,czylo,czyhi,vlo,vhi,cflo,cfhi, qlo,qhi, &
-      clo, chi, blo, bhi, fcxlo, fcxhi, fcylo, fcyhi, fczlo, fczhi, &
+      fcxlo, fcxhi, fcylo, fcyhi, fczlo, fczhi, &
       rdclo, rdchi, rfclo, rfchi, dflo, dfhi, lmlo, lmhi
     logical, intent(in) :: as_crse, as_fine
     integer, intent(in) :: ncomp
@@ -195,15 +193,11 @@ contains
     real(rt), intent(inout) :: fctrdz(fczlo(1):fczhi(1),fczlo(2):fczhi(2),fczlo(3):fczhi(3),ncomp)
     real(rt), intent(inout) :: ebdivop(oplo(1):ophi(1),oplo(2):ophi(2),oplo(3):ophi(3),ncomp)
     real(rt), intent(in) ::   q(qlo(1):qhi(1),qlo(2):qhi(2),qlo(3):qhi(3),qvar)
-    real(rt), intent(in) :: lam(clo(1):chi(1),clo(2):chi(2),clo(3):chi(3))
-    real(rt), intent(in) :: mu (clo(1):chi(1),clo(2):chi(2),clo(3):chi(3))
-    real(rt), intent(in) :: xi (clo(1):chi(1),clo(2):chi(2),clo(3):chi(3))
     real(rt) :: divc    (dvlo(1):dvhi(1),dvlo(2):dvhi(2),dvlo(3):dvhi(3))
     real(rt) :: optmp   (dvlo(1):dvhi(1),dvlo(2):dvhi(2),dvlo(3):dvhi(3))
     real(rt) :: rediswgt(dvlo(1):dvhi(1),dvlo(2):dvhi(2),dvlo(3):dvhi(3))
     real(rt) :: delm    (dmlo(1):dmhi(1),dmlo(2):dmhi(2),dmlo(3):dmhi(3))
     real(rt), intent(in) :: vfrac(vlo(1):vhi(1),vlo(2):vhi(2),vlo(3):vhi(3))
-    real(rt), intent(in) :: bcent(blo(1):bhi(1),blo(2):bhi(2),blo(3):bhi(3),3)
     real(rt), intent(in) :: apx(axlo(1):axhi(1),axlo(2):axhi(2),axlo(3):axhi(3))
     real(rt), intent(in) :: apy(aylo(1):ayhi(1),aylo(2):ayhi(2),aylo(3):ayhi(3))
     real(rt), intent(in) :: apz(azlo(1):azhi(1),azlo(2):azhi(2),azlo(3):azhi(3))
@@ -226,8 +220,6 @@ contains
     real(rt) :: fxp,fxm,fyp,fym,fzp,fzm,divnc, vtot,wtot, fracx,fracy,fracz,dxinv(3)
     real(rt) :: divwn, drho
     real(rt), pointer, contiguous :: divhyp(:,:)
-
-    !  centroid nondimensional  and zero at face center
 
     dxinv = 1.d0/dx
 
@@ -266,7 +258,8 @@ contains
               valid_cell = is_inside(i,j,k,lo,hi)
 
               call get_neighbor_cells(cellflag(i,j,k),nbr)
-
+              
+              ! linear interpolation of face flux
               ! x-direction lo face
               if (apx(i,j,k).lt.1.d0) then
                 if (centx_y(i,j,k).le.0.d0) then
@@ -757,6 +750,7 @@ contains
 
   end subroutine compute_eb_flux
 
+  !TODO: use information of flag to calculate normal direction flux
   subroutine strange_flux(q, qd_lo, qd_hi, &
     lo, hi, dx, &
     flux1, fd1_lo, fd1_hi, &
