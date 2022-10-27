@@ -528,10 +528,18 @@ Real NC::advance(Real time, Real dt, int iteration, int /*ncycle*/)
         current = &flux_reg;
     }
 
-    // TODO: RK3 is not conservative in AMR
     // TODO: Use implicit time integration
     // TODO: use spectral deferred correction method
-    if (time_integration == "RK2")
+    // TODO: or consider using builtin RK3/4 interface to maintain accuracy
+
+    // add Euler here for debug
+    if (time_integration == "Euler")
+    {
+        FillPatch(*this, Sborder, NUM_GROW, time, State_Type, 0, NUM_STATE);
+        compute_dSdt(Sborder, dSdt, dt, fine, current);
+        MultiFab::LinComb(S_new, 1.0, Sborder, 0, dt, dSdt, 0, 0, NUM_STATE, 0);
+    }
+    else if (time_integration == "RK2")
     {
         // RK2 stage 1
         FillPatch(*this, Sborder, NUM_GROW, time, State_Type, 0, NUM_STATE);
