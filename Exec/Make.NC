@@ -12,7 +12,7 @@ USE_EB := TRUE
 
 include $(AMREX_HOME)/Tools/GNUMake/Make.defs
 
-DEFINES += -DAMREX_CRSEGRNDOMP
+# DEFINES += -DAMREX_CRSEGRNDOMP
 
 include $(TOP)/Source/Make.package
 INCLUDE_LOCATIONS += $(TOP)/Source
