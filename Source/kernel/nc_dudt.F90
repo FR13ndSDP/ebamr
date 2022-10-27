@@ -84,12 +84,9 @@ module nc_dudt_module
         integer, intent(in) :: level
     
         integer :: i,j,k,n
-        real(rt) :: dxinv(3), coeff
+        real(rt) :: dxinv(3)
     
         dxinv = 1.d0/dx
-        ! uniform grid
-        ! TODO: varify this coefficient
-        coeff = dx(1)*dx(1)*dt/2.d0**level
     
         do       k = lo(3),hi(3)
           do     j = lo(2),hi(2)
@@ -100,13 +97,6 @@ module nc_dudt_module
               end do
           end do
         end do
-
-        ! scale by dt and face area to reflux
-        if (do_reflux) then
-          ! fx = fx*coeff
-          ! fy = fy*coeff
-          ! fz = fz*coeff
-        endif
     end subroutine compute_divop
 
     subroutine c2prim(lo, hi, u, ulo, uhi, q, qlo, qhi)
