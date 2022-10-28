@@ -4,6 +4,8 @@ module nc_ibm_module
     qv, qw, qp, urho, ueden, umx, umy, umz, nghost_plm, nextra_eb
   use amrex_mempool_module, only : amrex_allocate, amrex_deallocate
   use amrex_error_module, only : amrex_abort
+  use amrex_ebcellflag_module, only : is_regular_cell, is_covered_cell, is_single_valued_cell, &
+  get_neighbor_cells
 
   implicit none
   private
@@ -23,7 +25,6 @@ contains
     dx,dt,level) &
     bind(c,name='eb_compute_dudt')
     use nc_dudt_module, only : c2prim
-    use advection_module, only : compute_flux
     integer, dimension(3), intent(in) :: lo,hi,utlo,uthi,ulo,uhi, &
       vlo,vhi,axlo,axhi,aylo,ayhi,azlo,azhi, &
       cxlo,cxhi,cylo,cyhi,czlo,czhi, &
@@ -60,7 +61,7 @@ contains
     real(rt), dimension(:,:,:), pointer, contiguous :: lambda, mu, xi
     integer, parameter :: nghost = nextra_eb + 3 ! 3 because of wall flux
 
-    integer :: k,n
+    integer :: k,n, i, j
     logical :: as_crse, as_fine
 
     as_crse = as_crse_in .ne. 0
@@ -97,6 +98,16 @@ contains
 
     ! for the eb cell , should be verified
     ! TODO
+    ! q: -5 20
+    ! lo: 0
+    ! hi: 15
+    ! lfxlo: -2 -3 -3
+    ! lfxhi: 18
+    ! fg: -5 20
+    ! dudt: with no ghost
+    ! u : with 5 ghost cells
+    ! fxlo: 0
+    ! fxhi: 16 15 15
     call strange_flux(q, qlo, qhi, lo, hi, dx, &
       fhx, lfxlo, lfxhi, fhy, lfylo, lfyhi, fhz, lfzlo, lfzhi,&
       flag, fglo, fghi)
@@ -112,6 +123,8 @@ contains
 
     dm_as_fine = 0.d0
 
+    ! fx fy fz updated here to correctly reflux
+    ! only for cut cells
     call compute_eb_divop(lo,hi,5,dx,dt,fhx,lfxlo,lfxhi,fhy,lfylo,lfyhi,fhz,lfzlo,lfzhi,&
       fx, fxlo, fxhi, fy, fylo, fyhi, fz, fzlo, fzhi, &
       dudt,utlo,uthi, q,qlo,qhi, &
@@ -127,6 +140,9 @@ contains
       as_fine, dm_as_fine, dflo, dfhi, &
       levmsk, lmlo, lmhi)
 
+    
+    ! call write_slice('fluxx', fxlo, fxhi, fx(:,:,1,1))
+
     call amrex_deallocate(fhy)
     call amrex_deallocate(fhx)
     call amrex_deallocate(fhz)
@@ -136,6 +152,114 @@ contains
     call amrex_deallocate(divc)
     call amrex_deallocate(q)
   end subroutine eb_compute_dudt
+
+
+  !TODO: use information of flag to calculate normal direction flux
+  ! flag and q: with 5 ghost cells
+  ! lo and hi : 0 15
+  ! flux: with 3 ghost but in main direction with 2, 3
+  subroutine strange_flux(q, qd_lo, qd_hi, &
+    lo, hi, dx, &
+    flux1, fd1_lo, fd1_hi, &
+    flux2, fd2_lo, fd2_hi, &
+    flux3, fd3_lo, fd3_hi, &
+    flag, fg_lo, fg_hi)
+    use fluxsplit_module, only : flux_split
+
+    integer, intent(in) :: qd_lo(3), qd_hi(3)
+    integer, intent(in) :: lo(3), hi(3)
+    integer, intent(in) :: fd1_lo(3), fd1_hi(3)
+    integer, intent(in) :: fd2_lo(3), fd2_hi(3)
+    integer, intent(in) :: fd3_lo(3), fd3_hi(3)
+    integer, intent(in) :: fg_lo(3), fg_hi(3)
+    real(rt), intent(in) :: dx(3)
+    real(rt), intent(in   ) ::     q( qd_lo(1): qd_hi(1), qd_lo(2): qd_hi(2), qd_lo(3): qd_hi(3),QVAR)
+    real(rt), intent(inout) :: flux1(fd1_lo(1):fd1_hi(1),fd1_lo(2):fd1_hi(2),fd1_lo(3):fd1_hi(3),5)
+    real(rt), intent(inout) :: flux2(fd2_lo(1):fd2_hi(1),fd2_lo(2):fd2_hi(2),fd2_lo(3):fd2_hi(3),5)
+    real(rt), intent(inout) :: flux3(fd3_lo(1):fd3_hi(1),fd3_lo(2):fd3_hi(2),fd3_lo(3):fd3_hi(3),5)
+    integer,  intent(in   ) ::  flag( fg_lo(1): fg_hi(1), fg_lo(2): fg_hi(2), fg_lo(3): fg_hi(3))
+
+    real(rt), dimension(5) :: qL, qR, flux_loc
+    real(rt) :: tmp
+    integer :: i,j,k,n
+    integer :: nbr(-1:1,-1:1,-1:1)
+
+    ! X-direction
+    do k = fd1_lo(3) ,fd1_hi(3)
+      do j = fd1_lo(2), fd1_hi(2)
+        do i = fd1_lo(1), fd1_hi(1)
+          do n = 1,QVAR
+            qL(n) = q(i-1,j,k, n)
+            qR(n) = q(i,j,k, n)
+          end do
+          call flux_split(qL, qR, flux_loc)
+
+          flux1(i,j,k,:) = flux_loc
+
+        end do
+      end do
+    end do
+
+    ! Y-direction
+    do k = fd2_lo(3), fd2_hi(3)
+      do j = fd2_lo(2), fd2_hi(2)
+        do i = fd2_lo(1), fd2_hi(1)
+          do n = 1,QVAR
+            qL(n) = q(i,j-1,k, n)
+            qR(n) = q(i,j,k, n)
+          end do
+          ! rotate here
+          tmp = qL(qu)
+          qL(qu) = qL(qv)
+          qL(qv) = -tmp
+
+          tmp = qR(qu)
+          qR(qu) = qR(qv)
+          qR(qv) = -tmp
+          call flux_split(qL, qR, flux_loc)
+
+          ! revert
+          tmp = flux_loc(qu)
+          flux_loc(qu) = -flux_loc(qv)
+          flux_loc(qv) = tmp
+
+          flux2(i,j,k,:) = flux_loc
+
+        end do
+      end do
+    end do
+
+    ! Z-direction
+    do k = fd3_lo(3), fd3_hi(3)
+      do j = fd3_lo(2), fd3_hi(2)
+        do i = fd3_lo(1), fd3_hi(1)
+          do n = 1,QVAR
+            qL(n) = q(i,j,k-1, n)
+            qR(n) = q(i,j,k, n)
+          end do
+          ! exchange u and w
+          tmp = qL(qu)
+          qL(qu) = qL(qw)
+          qL(qw) = -tmp
+
+          tmp = qR(qu)
+          qR(qu) = qR(qw)
+          qR(qw) = -tmp
+
+          call flux_split(qL, qR, flux_loc)
+
+          ! revert
+          tmp = flux_loc(qu)
+          flux_loc(qu) = -flux_loc(qw)
+          flux_loc(qw) = tmp
+
+          flux3(i,j,k,:) = flux_loc
+
+        end do
+      end do
+    end do
+
+  end subroutine strange_flux
 
   pure logical function is_inside (i,j,k,lo,hi)
     integer, intent(in) :: i,j,k,lo(3),hi(3)
@@ -149,7 +273,7 @@ contains
     fluxx,fxlo,fxhi, &       ! flux at face center
     fluxy,fylo,fyhi, &
     fluxz,fzlo,fzhi, &
-    fctrdx, fcxlo, fcxhi, &     ! flux at centroid
+    fctrdx, fcxlo, fcxhi, &     ! flux for reflux, defined on valid cells
     fctrdy, fcylo, fcyhi, &
     fctrdz, fczlo, fczhi, &
     ebdivop, oplo, ophi, &
@@ -171,9 +295,7 @@ contains
     as_fine, dm_as_fine, dflo, dfhi, &
     levmsk, lmlo, lmhi)
 
-    use nc_module, only : qvar, qrho, qu, qv, qw, qp, umx, umy, umz
-    use amrex_ebcellflag_module, only : is_regular_cell, is_covered_cell, is_single_valued_cell, &
-      get_neighbor_cells
+
     use amrex_eb_flux_reg_nd_module, only : crse_cell, crse_fine_boundary_cell, &
       covered_by_fine=>fine_cell, reredistribution_threshold
 
@@ -245,14 +367,20 @@ contains
       do       k = lo(3)-2, hi(3)+2
         do    j = lo(2)-2, hi(2)+2
           do i = lo(1)-2, hi(1)+2
-            divc(i,j,k) = (fluxx(i,j,k,n)-fluxx(i+1,j,k,n))*dxinv(1) &
-              +        (fluxy(i,j,k,n)-fluxy(i,j+1,k,n))*dxinv(2) &
-              +        (fluxz(i,j,k,n)-fluxz(i,j,k+1,n))*dxinv(3)
-          end do
-
-          do i = lo(1)-2, hi(1)+2
-            if (is_covered_cell(cellflag(i,j,k))) then
+            if (is_regular_cell(cellflag(i,j,k))) then
+              divc(i,j,k) = (fluxx(i,j,k,n)-fluxx(i+1,j,k,n))*dxinv(1) &
+                +        (fluxy(i,j,k,n)-fluxy(i,j+1,k,n))*dxinv(2) &
+                +        (fluxz(i,j,k,n)-fluxz(i,j,k+1,n))*dxinv(3)
+            else if (is_covered_cell(cellflag(i,j,k))) then
               divc(i,j,k) = 0.d0
+              if (is_inside(i,j,k,lo,hi)) then
+                fctrdx(i,j,k,n) = 0.d0
+                fctrdx(i+1,j,k,n) = 0.d0
+                fctrdy(i,j,k,n) = 0.d0
+                fctrdy(i,j+1,k,n) = 0.d0
+                fctrdz(i,j,k,n) = 0.d0
+                fctrdz(i,j,k+1,n) = 0.d0
+              end if
             else if (is_single_valued_cell(cellflag(i,j,k))) then
 
               valid_cell = is_inside(i,j,k,lo,hi)
@@ -696,6 +824,7 @@ contains
   end subroutine compute_hyp_wallflux
 
   ! solve riemann problem on EB face
+  !TODO: use exact riemann solver for this
   subroutine compute_eb_flux(rl, un, p, flux)
     real(rt), intent(in) :: rl, un, p
     real(rt), intent(inout) :: flux(qvar)
@@ -750,112 +879,6 @@ contains
 
   end subroutine compute_eb_flux
 
-  !TODO: use information of flag to calculate normal direction flux
-  subroutine strange_flux(q, qd_lo, qd_hi, &
-    lo, hi, dx, &
-    flux1, fd1_lo, fd1_hi, &
-    flux2, fd2_lo, fd2_hi, &
-    flux3, fd3_lo, fd3_hi, &
-    flag, fg_lo, fg_hi)
-    use amrex_mempool_module, only : amrex_allocate, amrex_deallocate
-    use nc_module, only : urho, umx, umy, umz, ueden, nvar, &
-      qrho,qu,qv,qw,qp,qvar, smallp, smallr, gamma, refactor_scheme
-    use fluxsplit_module, only : flux_split
-
-    integer, intent(in) :: qd_lo(3), qd_hi(3)
-    integer, intent(in) :: lo(3), hi(3)
-    integer, intent(in) :: fd1_lo(3), fd1_hi(3)
-    integer, intent(in) :: fd2_lo(3), fd2_hi(3)
-    integer, intent(in) :: fd3_lo(3), fd3_hi(3)
-    integer, intent(in) :: fg_lo(3), fg_hi(3)
-    real(rt), intent(in) :: dx(3)
-    real(rt), intent(in   ) ::     q( qd_lo(1): qd_hi(1), qd_lo(2): qd_hi(2), qd_lo(3): qd_hi(3),QVAR)
-    real(rt), intent(inout) :: flux1(fd1_lo(1):fd1_hi(1),fd1_lo(2):fd1_hi(2),fd1_lo(3):fd1_hi(3),5)
-    real(rt), intent(inout) :: flux2(fd2_lo(1):fd2_hi(1),fd2_lo(2):fd2_hi(2),fd2_lo(3):fd2_hi(3),5)
-    real(rt), intent(inout) :: flux3(fd3_lo(1):fd3_hi(1),fd3_lo(2):fd3_hi(2),fd3_lo(3):fd3_hi(3),5)
-    integer,  intent(in   ) ::  flag( fg_lo(1): fg_hi(1), fg_lo(2): fg_hi(2), fg_lo(3): fg_hi(3))
-
-    real(rt), dimension(5) :: qL, qR, flux_loc
-    real(rt) :: tmp
-    integer :: i,j,k,n
-
-    ! X-direction
-    do k = fd1_lo(3) ,fd1_hi(3)
-      do j = fd1_lo(2), fd1_hi(2)
-        do i = fd1_lo(1), fd1_hi(1)+1
-          do n = 1,QVAR
-            qL(n) = q(i-1,j,k, n)
-            qR(n) = q(i,j,k,n) 
-          end do
-          call flux_split(qL, qR, flux_loc)
-
-          flux1(i,j,k,:) = flux_loc
-
-        end do
-      end do
-    end do
-
-    ! Y-direction
-    do k = fd2_lo(3), fd2_hi(3)
-      do j = fd2_lo(2), fd2_hi(2)+1
-        do i = fd2_lo(1), fd2_hi(1)
-          do n = 1,QVAR
-            qL(n) = q(i,j-1,k, n) 
-            qR(n) = q(i,j,k, n)
-          end do
-          ! rotate here
-          tmp = qL(qu)
-          qL(qu) = qL(qv)
-          qL(qv) = -tmp
-
-          tmp = qR(qu)
-          qR(qu) = qR(qv)
-          qR(qv) = -tmp
-          call flux_split(qL, qR, flux_loc)
-
-          ! revert
-          tmp = flux_loc(qu)
-          flux_loc(qu) = -flux_loc(qv)
-          flux_loc(qv) = tmp
-
-          flux2(i,j,k,:) = flux_loc
-
-        end do
-      end do
-    end do
-
-    ! Z-direction
-    do k = fd3_lo(3), fd3_hi(3)+1
-      do j = fd3_lo(2), fd3_hi(2)
-        do i = fd3_lo(1), fd3_hi(1)
-          do n = 1,QVAR
-            qL(n) = q(i,j,k-1, n)
-            qR(n) = q(i,j,k, n)
-          end do
-          ! exchange u and w
-          tmp = qL(qu)
-          qL(qu) = qL(qw)
-          qL(qw) = -tmp
-
-          tmp = qR(qu)
-          qR(qu) = qR(qw)
-          qR(qw) = -tmp
-
-          call flux_split(qL, qR, flux_loc)
-
-          ! revert
-          tmp = flux_loc(qu)
-          flux_loc(qu) = -flux_loc(qw)
-          flux_loc(qw) = tmp
-
-          flux3(i,j,k,:) = flux_loc
-
-        end do
-      end do
-    end do
-
-  end subroutine strange_flux
-
   pure function minmod(a, b) result(res)
     real(rt) , intent(in) :: a, b
     real(rt) :: res
@@ -870,4 +893,21 @@ contains
     endif
   end function minmod
 
+  ! for debug
+  subroutine write_slice(filename, lo, hi, var)
+    character(len=50) :: filename
+    integer, intent(in) :: lo(3), hi(3)
+    real(rt), intent(inout) :: var(lo(1):hi(1), lo(2):hi(2))
+
+    integer :: i,j
+    open(16, file = trim(filename))
+    write(16, '(a)') 'variable = x, y, var'
+    write(16, *) 'zone i = ', hi(1)+1-lo(1), ' j = ', hi(2)+1-lo(2)
+    do j = lo(2), hi(2)
+      do i = lo(1), hi(1)
+        write(16, *) i, j, var(i,j)
+      end do
+    end do
+    close(16)
+  end subroutine
 end module nc_ibm_module
