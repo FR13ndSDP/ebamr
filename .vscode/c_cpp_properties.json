@@ -5,7 +5,8 @@
             "includePath": [
                 "${workspaceFolder}/Source/**",
                 "/home/sdp/AMR/libamrex/include/**",
-                "/usr/include/x86_64-linux-gnu/mpi/**"
+                "/usr/include/x86_64-linux-gnu/mpi/**",
+                "${workspaceFolder}/Util/**"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",
