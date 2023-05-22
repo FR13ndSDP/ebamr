@@ -38,3 +38,6 @@
 # after run
 **/Backtrace.*
 **/plt*
+
+# confifuration
+.vscode/**
