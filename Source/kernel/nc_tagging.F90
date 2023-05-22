@@ -34,8 +34,9 @@ contains
             az = MAX(az,ABS(rho(i,j,k) - rho(i,j,k-1)))
             if ( MAX(ax,ay,az) .ge. dengrad ) then
               tag(i,j,k) = tagval
-            else
-              tag(i,j,k) = clearval
+            ! When use with refine box, this will clear box tag
+            !else
+            !  tag(i,j,k) = clearval
             endif
           end if
         end do
