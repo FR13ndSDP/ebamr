@@ -35,8 +35,10 @@ contains
               qR(n) = q(i,j,k,n) - &
                 0.5d0 * minmod(q(i,j,k,n)-q(i-1,j,k,n), q(i+1,j,k,n)-q(i,j,k,n))
             end do
-          else
+          else if (refactor_scheme .eq. 2) then
             call weno_5th(qL, qR, q(i-3:i+2,j,k,:))
+          else
+            call teno_5th(qL, qR, q(i-3:i+2,j,k,:))
           end if
           call flux_split(qL, qR, flux_loc)
 
@@ -57,8 +59,10 @@ contains
               qR(n) = q(i,j,k, n) - &
                 0.5d0 * minmod(q(i,j,k,n)-q(i,j-1,k,n), q(i,j+1,k,n)-q(i,j,k,n))
             end do
-          else 
+          else if (refactor_scheme .eq. 2) then
             call weno_5th(qL, qR, q(i,j-3:j+2,k,:))
+          else
+            call teno_5th(qL, qR, q(i,j-3:j+2,k,:))
           end if
           ! rotate here
           tmp = qL(qu)
@@ -92,8 +96,10 @@ contains
               qR(n) = q(i,j,k, n) - &
                 0.5d0 * minmod(q(i,j,k,n)-q(i,j,k-1,n), q(i,j,k+1,n)-q(i,j,k,n))
             end do
-          else
+          else if (refactor_scheme .eq. 2) then
             call weno_5th(qL, qR, q(i,j,k-3:k+2,:))
+          else
+            call teno_5th(qL, qR, q(i,j,k-3:k+2,:))
           end if
           ! exchange u and w
           tmp = qL(qu)
@@ -179,6 +185,120 @@ contains
     omega(3,:) = alpha(3, :)/(sum(alpha, dim=1))
     qR = omega(1,:)*flux(1,:) + omega(2,:)*flux(2,:) + omega(3,:)*flux(3,:)
   end subroutine weno_5th
+
+  subroutine teno_5th(qL, qR, q)
+    use nc_module, only : QVAR
+    integer :: i
+    real(rt), intent(inout) :: qL(qvar), qR(qvar)
+    real(rt), intent(in) :: q(-3:2, qvar)
+    real(rt) :: s11(qvar), s22(qvar), s33(qvar), s55(qvar), sumation(qvar), a1(qvar), &
+                a2(qvar), a3(qvar), b1(qvar), b2(qvar), b3(qvar), v1(qvar), v2(qvar), &
+                v3(qvar), w1(qvar), w2(qvar), w3(qvar)
+    real(rt), parameter :: eps = 1d-40
+    real(rt), parameter :: onesix = 1.d0/6.d0
+
+    ! qL
+    s11 = 13.d0*(q(-3,:)-2.d0*q(-2,:)+q(-1,:))**2 + 3.d0*(q(-3,:)-4.d0*q(-2,:)+3.d0*q(-1,:))**2
+    s22 = 13.d0*(q(-2,:)-2.d0*q(-1,:)+q(0,:))**2 + 3.d0*(q(-2,:)-q(0,:))**2
+    s33 = 13.d0*(q(-1,:)-2.d0*q(0,:)+q(1,:))**2 + 3.d0*(3.d0*q(-1,:)-4.d0*q(0,:)+q(1,:))**2
+
+    s55 = abs(s11-s33)
+
+    a1 = (1.d0+s55/(s11+eps))**6
+    a2 = (1.d0+s55/(s22+eps))**6
+    a3 = (1.d0+s55/(s33+eps))**6
+    
+    sumation = a1+a2+a3
+    b1 = a1/sumation
+    b2 = a2/sumation
+    b3 = a3/sumation
+
+    do i = 1,QVAR
+      if (b1(i) < 1d-5) then
+        b1(i) = 0.d0
+      else
+        b1(i) = 1.d0
+      end if
+
+      if (b2(i) < 1d-5) then
+        b2(i) = 0.d0
+      else
+        b2(i) = 1.d0
+      end if
+
+      if (b3(i) < 1d-5) then
+        b3(i) = 0.d0
+      else
+        b3(i) = 1.d0
+      end if
+    end do
+
+    v1 = onesix*(2.d0*q(-3,:)-7.d0*q(-2,:)+5.d0*q(-1,:))
+    v2 = onesix*(-q(-2,:)-q(-1,:)+2.d0*q(0,:))
+    v3 = onesix*(-4.d0*q(-1,:)+5.d0*q(0,:)-q(1,:))
+
+    a1 = 0.1d0*b1
+    a2 = 0.6d0*b2
+    a3 = 0.3d0*b3
+
+    sumation = a1+a2+a3
+    w1 = a1/sumation
+    w2 = a2/sumation
+    w3 = a3/sumation
+
+    qL = q(-1,:)+w1*v1+w2*v2+w3*v3
+
+    ! qR
+    s11 = 13.d0*(q(2,:)-2.d0*q(1,:)+q(0,:))**2 + 3.d0*(q(2,:)-4.d0*q(1,:)+3.d0*q(0,:))**2
+    s22 = 13.d0*(q(-1,:)-2.d0*q(0,:)+q(1,:))**2 + 3.d0*(q(1,:)-q(-1,:))**2
+    s33 = 13.d0*(q(0,:)-2.d0*q(-1,:)+q(-2,:))**2 + 3.d0*(3.d0*q(0,:)-4.d0*q(-1,:)+q(-2,:))**2
+
+    s55 = abs(s11-s33)
+
+    a1 = (1.d0+s55/(s11+eps))**6
+    a2 = (1.d0+s55/(s22+eps))**6
+    a3 = (1.d0+s55/(s33+eps))**6
+    
+    sumation = a1+a2+a3
+    b1 = a1/sumation
+    b2 = a2/sumation
+    b3 = a3/sumation
+
+    do i = 1,QVAR
+      if (b1(i) < 1d-5) then
+        b1(i) = 0.d0
+      else
+        b1(i) = 1.d0
+      end if
+
+      if (b2(i) < 1d-5) then
+        b2(i) = 0.d0
+      else
+        b2(i) = 1.d0
+      end if
+
+      if (b3(i) < 1d-5) then
+        b3(i) = 0.d0
+      else
+        b3(i) = 1.d0
+      end if
+    end do
+
+    v1 = onesix*(2.d0*q(2,:)-7.d0*q(1,:)+5.d0*q(0,:))
+    v2 = onesix*(-q(1,:)-q(0,:)+2.d0*q(-1,:))
+    v3 = onesix*(-4.d0*q(0,:)+5.d0*q(-1,:)-q(-2,:))
+
+    a1 = 0.1d0*b1
+    a2 = 0.6d0*b2
+    a3 = 0.3d0*b3
+
+    sumation = a1+a2+a3
+    w1 = a1/sumation
+    w2 = a2/sumation
+    w3 = a3/sumation
+
+    qR = q(0,:)+w1*v1+w2*v2+w3*v3
+  end subroutine teno_5th
 
   pure function minmod(a, b) result(res)
     real(rt) , intent(in) :: a, b

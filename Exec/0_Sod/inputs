@@ -1,11 +1,14 @@
-max_step  = 100
+max_step  = 1000
 stop_time = 0.14
+
+# 1:NND, 2:WENO5, 3:TENO5
+nc.refactor_scheme = 3
 
 geometry.is_periodic = 0 1 1
 geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
 geometry.prob_lo     =   0.0      0.0      0.0
-geometry.prob_hi     =   1.0      1.0     1.0
-amr.n_cell           =   64       64      64
+geometry.prob_hi     =   1.0      0.03125     0.03125
+amr.n_cell           =   256      8       8
 
 # >>>>>>>>>>>>>  BC FLAGS <<<<<<<<<<<<<<<<
 # 0 = Interior           3 = Symmetry
@@ -15,7 +18,7 @@ amr.n_cell           =   64       64      64
 nc.lo_bc       =  2   0   0
 nc.hi_bc       =  2   0   0
 
-nc.cfl = 0.3  # cfl number for hyperbolic system
+nc.cfl = 0.5  # cfl number for hyperbolic system
 
 nc.v = 2
 amr.v = 1
@@ -26,10 +29,10 @@ amr.loadbalance_level0_int = 1000
 
 # REFINEMENT / REGRIDDING 
 amr.check_input     = 0       # 
-amr.max_level       = 1       # maximum level number allowed
+amr.max_level       = 0       # maximum level number allowed
 amr.ref_ratio       = 2 2 2 2 # refinement ratio
 amr.regrid_int      = 2 2 2 2 # how often to regrid
-amr.blocking_factor = 16
+amr.blocking_factor = 8
 amr.max_grid_size   = 64
 amr.n_error_buf     = 2 2 2 2 # number of buffer cells in error est
 amr.grid_eff        = 0.99     # what constitutes an efficient grid
@@ -48,8 +51,8 @@ amr.derive_plot_vars  = T p ux uy uz
 nc.refine_dengrad = 0.06
 nc.refine_max_dengrad_lev = 2
 nc.do_reflux = 1
-# nc.hydro_tile_size = 256 256 256
-nc.time_integration = RK2
+nc.hydro_tile_size = 16 16 16
+nc.time_integration = RK3
 nc.do_visc = 0
 
 # EB parameters
