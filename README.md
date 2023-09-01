@@ -1,6 +1,6 @@
 # ebamr
 # !! WARNING !!
-ebamr development is currently stalled in favor of its GPU version ebamr-GPU
+ebamr development is currently stalled in favor of its GPU version OpenCFD-AMR
 ---
 Using Embedded Boundary Method and AMR to solve discreted equations.
 - Based on AMReX to implement AMR (adaptive mesh refinement)
